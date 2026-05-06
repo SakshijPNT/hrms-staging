@@ -1,0 +1,11 @@
+bin/
+obj/
+node_modules/
+dist/
+.vs/
+.vscode/
+*.user
+*.suo
+*.db
+*.log
+src/frontend/hrms-web/.env.local
