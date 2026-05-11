@@ -190,6 +190,7 @@ public class HrmsDbContext : DbContext
         {
             entity.Property(x => x.TotalDays).HasPrecision(5, 1);
             entity.Property(x => x.IsHalfDay).HasDefaultValue(false);
+            entity.Property(x => x.Session).HasMaxLength(20);
             entity.Property(x => x.Reason).HasMaxLength(500);
             entity.Property(x => x.ApprovalStatus).IsRequired().HasMaxLength(20).HasDefaultValue("PENDING");
             entity.Property(x => x.ApproverRemark).HasMaxLength(500);
@@ -201,6 +202,7 @@ public class HrmsDbContext : DbContext
             {
                 t.HasCheckConstraint("chk_la_approvalstatus", "approvalstatus IN ('PENDING','APPROVED','REJECTED','CANCELLED')");
                 t.HasCheckConstraint("chk_la_dates", "todate >= fromdate");
+                t.HasCheckConstraint("chk_la_session", "session IS NULL OR session IN ('FIRST_HALF','SECOND_HALF')");
             });
 
             entity.HasIndex(x => x.UserId).HasDatabaseName("idx_la_userid");
