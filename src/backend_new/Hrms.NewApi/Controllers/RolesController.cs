@@ -84,9 +84,35 @@ public class RolesController : ControllerBase
         return Ok(roles);
     }
 
+    [HttpDelete("{id:int}")]
+     public async Task<IActionResult> DeleteRole(int id, CancellationToken cancellationToken)
+     {    
+       var session = GetSessionInfo();
+       if (session is null)
+       {
+           return Unauthorized(new { message = "No active session." });
+       }
+
+    try
+    {
+        await _roleManager.DeleteRoleAsync(id, session.CompanyId, cancellationToken);
+          return NoContent();
+    }
+    catch (KeyNotFoundException ex)
+    {
+        return NotFound(new { message = ex.Message });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return BadRequest(new { message = ex.Message });
+    }
+}
+ 
+
     private SessionInfoDto? GetSessionInfo()
     {
         var rawSession = HttpContext.Session.GetString(SessionKey);
         return rawSession is null ? null : JsonSerializer.Deserialize<SessionInfoDto>(rawSession);
     }
+
 }

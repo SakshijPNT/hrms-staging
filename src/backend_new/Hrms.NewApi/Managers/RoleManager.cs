@@ -122,4 +122,24 @@ public class RoleManager : IRoleManager
             UpdatedOn = role.UpdatedOn,
         };
     }
+    
+    public async Task DeleteRoleAsync(
+    int id,
+    int companyId,
+    CancellationToken cancellationToken = default)
+{
+    var role = await _dbContext.RoleMasters
+        .FirstOrDefaultAsync(
+            x => x.Id == id && x.CompanyId == companyId,
+            cancellationToken)
+        ?? throw new KeyNotFoundException($"Role with id {id} does not exist");
+
+    _dbContext.RoleMasters.Remove(role);
+
+    await _dbContext.SaveChangesAsync(cancellationToken);
+}
+
+
+
+
 }
