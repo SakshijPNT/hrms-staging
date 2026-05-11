@@ -17,11 +17,15 @@ export function LoginPage() {
     setError('')
 
     try {
-      await login({ email, password })
+      await login({ email: email.trim(), password })
       startTransition(() => navigate('/dashboard', { replace: true }))
     } catch (requestError) {
       if (requestError instanceof AxiosError) {
-        setError(requestError.response?.data?.message ?? 'Unable to sign in with the provided credentials.')
+        setError(
+          requestError.response?.data?.message
+            ?? requestError.message
+            ?? 'Unable to sign in with the provided credentials.',
+        )
       } else {
         setError('Unexpected error while signing in. Please retry.')
       }

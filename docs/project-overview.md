@@ -23,7 +23,7 @@ PNTHR HRMS (Human Resource Management System) is a full-stack web application bu
 | API Docs    | Swagger / OpenAPI                 | Browse and test API endpoints visually   |
 
 ---
-
+ 
 ## Architecture – How the Pieces Fit
 
 ```

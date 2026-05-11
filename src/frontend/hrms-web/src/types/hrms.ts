@@ -1,4 +1,4 @@
-export interface AuthenticatedUser {
+export interface AuthenticatedUser { //“Data will come in this format”
   id: string
   email: string
   fullName: string
@@ -64,7 +64,7 @@ export interface Activity {
   description: string
   type: string
   moduleCode: string
-  moduleName: string
+  moduleName: string  
   assignedRoleCount: number
 }
 

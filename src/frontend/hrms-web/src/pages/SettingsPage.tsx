@@ -1,216 +1,427 @@
-import { useState } from 'react'
+import { useMemo, useState, type FormEvent } from 'react'
 
-interface Holiday {
-  id: number
+interface Company {
+  id: string
   name: string
-  date: string
-  type: 'National' | 'Optional' | 'Restricted'
+  code: string
+  industry: string
+  companyPhone: string
+  city: string
+  state: string
+  country: string
+  pincode: string
+  timezone: string
+  status: boolean
 }
 
-const DEFAULT_HOLIDAYS: Holiday[] = [
-  { id: 1, name: 'Republic Day', date: '2026-01-26', type: 'National' },
-  { id: 2, name: 'Holi', date: '2026-03-03', type: 'National' },
-  { id: 3, name: 'Good Friday', date: '2026-04-03', type: 'National' },
-  { id: 4, name: 'Eid ul-Fitr', date: '2026-04-21', type: 'National' },
-  { id: 5, name: 'Independence Day', date: '2026-08-15', type: 'National' },
-  { id: 6, name: 'Gandhi Jayanti', date: '2026-10-02', type: 'National' },
-  { id: 7, name: 'Dussehra', date: '2026-10-21', type: 'National' },
-  { id: 8, name: 'Diwali', date: '2026-11-08', type: 'National' },
-  { id: 9, name: 'Christmas', date: '2026-12-25', type: 'National' },
+const DEFAULT_COMPANIES: Company[] = [
+  {
+    id: 'COMP-101',
+    name: 'Tech Solutions Pvt Ltd',
+    code: 'TS-001',
+    industry: 'IT',
+    companyPhone: '9876543210',
+    city: 'Mumbai',
+    state: 'Maharashtra',
+    country: 'India',
+    pincode: '400001',
+    timezone: 'IST',
+    status: true,
+  },
+  {
+    id: 'COMP-102',
+    name: 'FinCorp India',
+    code: 'FC-002',
+    industry: 'Finance',
+    companyPhone: '9988776655',
+    city: 'Pune',
+    state: 'Maharashtra',
+    country: 'India',
+    pincode: '411001',
+    timezone: 'IST',
+    status: true,
+  },
 ]
 
-const ALL_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+export function SettingsPage() {
+  const [companies, setCompanies] = useState<Company[]>(DEFAULT_COMPANIES)
+  const [search, setSearch] = useState('')
+  const [modalOpen, setModalOpen] = useState(false)
 
-const DEFAULT_WEEKLY_OFF = ['Saturday', 'Sunday']
+ const [form, setForm] = useState({
+  id: '',
+  name: '',
+  code: '',
+  industry: '',
+  companyPhone: '',
+  city: '',
+  state: '',
+  country: '',
+  pincode: '',
+  timezone: '',
+})
 
-function formatHolidayDate(value: string) {
-  return new Date(`${value}T00:00:00`).toLocaleDateString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  })
+  const [error, setError] = useState('')
+
+  // Search
+  const filteredCompanies = useMemo(() => {
+    const q = search.toLowerCase()
+
+    return companies.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        c.code.toLowerCase().includes(q) ||
+        c.city.toLowerCase().includes(q) ||
+        c.state.toLowerCase().includes(q),
+    )
+  }, [companies, search])
+
+  function openModal() {
+    setForm({
+      id: '',
+      name: '',
+      code: '',
+      industry: '',
+      companyPhone: '',
+      city: '',
+      state: '',
+      country: '',
+      pincode: '',
+      timezone: '',
+    })
+
+    setError('')
+    setModalOpen(true)
+  }
+
+  function closeModal() {
+    setModalOpen(false)
+  }
+
+  function toggleStatus(id: string) {
+    setCompanies((prev) =>
+      prev.map((company) =>
+        company.id === id
+          ? { ...company, status: !company.status }
+          : company,
+      ),
+    )
+  }
+
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+
+    if (!form.id || !form.name || !form.code) {
+  setError('Id, Name and Code are required')
+  return
 }
 
-export function SettingsPage() {
-  const [holidays, setHolidays] = useState<Holiday[]>(DEFAULT_HOLIDAYS)
-  const [weeklyOff, setWeeklyOff] = useState<string[]>(DEFAULT_WEEKLY_OFF)
-  const [showAddHoliday, setShowAddHoliday] = useState(false)
-  const [newHoliday, setNewHoliday] = useState({ name: '', date: '', type: 'National' as Holiday['type'] })
-  const [addError, setAddError] = useState('')
-  const [saved, setSaved] = useState(false)
-
-  function toggleDay(day: string) {
-    setWeeklyOff((prev) =>
-      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day],
-    )
-    setSaved(false)
-  }
-
-  function handleAddHoliday() {
-    if (!newHoliday.name.trim() || !newHoliday.date) {
-      setAddError('Name and date are required.')
-      return
+    const newCompany: Company = {
+      
+      ...form,
+      status: true,
     }
-    setHolidays((prev) => [
-      ...prev,
-      { id: Date.now(), name: newHoliday.name.trim(), date: newHoliday.date, type: newHoliday.type },
-    ])
-    setNewHoliday({ name: '', date: '', type: 'National' })
-    setAddError('')
-    setShowAddHoliday(false)
-    setSaved(false)
-  }
 
-  function handleDeleteHoliday(id: number) {
-    setHolidays((prev) => prev.filter((h) => h.id !== id))
-    setSaved(false)
-  }
+    setCompanies((prev) => [newCompany, ...prev])
 
-  function handleSave() {
-    setSaved(true)
+    closeModal()
   }
 
   return (
-    <section className="settings-page">
-      <header className="settings-topbar">
-        <h1 className="settings-kicker">SETTINGS</h1>
-      </header>
-
-      {/* Holiday Calendar */}
-      <section className="settings-card">
-        <div className="settings-card-header">
-          <div>
-            <h2>Holiday Calendar</h2>
-            <p className="settings-card-sub">Manage official and optional holidays for the organisation.</p>
-          </div>
-          <button
-            className="settings-add-btn"
-            onClick={() => { setShowAddHoliday(true); setAddError('') }}
-          >
-            + Add Holiday
-          </button>
+    <div className="act-page">
+      {/* Header */}
+      <div className="act-page-header">
+        <div>
+          <h1 className="act-title">Settings</h1>
         </div>
 
-        {showAddHoliday && (
-          <div className="settings-inline-form">
-            <div className="settings-form-row">
-              <label className="settings-form-field">
-                <span>Holiday Name *</span>
-                <input
-                  type="text"
-                  placeholder="e.g. Diwali"
-                  value={newHoliday.name}
-                  onChange={(e) => setNewHoliday((p) => ({ ...p, name: e.target.value }))}
-                />
-              </label>
-              <label className="settings-form-field">
-                <span>Date *</span>
-                <input
-                  type="date"
-                  value={newHoliday.date}
-                  onChange={(e) => setNewHoliday((p) => ({ ...p, date: e.target.value }))}
-                />
-              </label>
-              <label className="settings-form-field">
-                <span>Type</span>
-                <select
-                  value={newHoliday.type}
-                  onChange={(e) => setNewHoliday((p) => ({ ...p, type: e.target.value as Holiday['type'] }))}
-                >
-                  <option value="National">National</option>
-                  <option value="Optional">Optional</option>
-                  <option value="Restricted">Restricted</option>
-                </select>
-              </label>
-            </div>
-            {addError && <p className="settings-form-error">{addError}</p>}
-            <div className="settings-form-actions">
-              <button className="settings-cancel-btn" onClick={() => setShowAddHoliday(false)}>Cancel</button>
-              <button className="settings-save-btn" onClick={handleAddHoliday}>Add</button>
-            </div>
-          </div>
-        )}
-
-        <div className="settings-table-wrap">
-          <table className="settings-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>HOLIDAY</th>
-                <th>DATE</th>
-                <th>TYPE</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {holidays.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="settings-empty">No holidays configured.</td>
-                </tr>
-              ) : (
-                holidays
-                  .slice()
-                  .sort((a, b) => a.date.localeCompare(b.date))
-                  .map((holiday, index) => (
-                    <tr key={holiday.id}>
-                      <td className="settings-serial">{index + 1}</td>
-                      <td><strong>{holiday.name}</strong></td>
-                      <td>{formatHolidayDate(holiday.date)}</td>
-                      <td>
-                        <span className={`settings-type-pill type-${holiday.type.toLowerCase()}`}>
-                          {holiday.type}
-                        </span>
-                      </td>
-                      <td>
-                        <button
-                          className="settings-delete-btn"
-                          onClick={() => handleDeleteHoliday(holiday.id)}
-                          aria-label={`Delete ${holiday.name}`}
-                        >
-                          ✕
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      {/* Weekly Off */}
-      <section className="settings-card">
-        <div className="settings-card-header">
-          <div>
-            <h2>Weekly Off</h2>
-            <p className="settings-card-sub">Select the days that are non-working days for the organisation.</p>
-          </div>
-        </div>
-
-        <div className="settings-day-grid">
-          {ALL_DAYS.map((day) => {
-            const isOff = weeklyOff.includes(day)
-            return (
-              <button
-                key={day}
-                type="button"
-                className={`settings-day-chip ${isOff ? 'day-off' : 'day-working'}`}
-                onClick={() => toggleDay(day)}
-              >
-                <span className="settings-day-label">{day.slice(0, 3).toUpperCase()}</span>
-                <span className="settings-day-status">{isOff ? 'Off' : 'Working'}</span>
-              </button>
-            )
-          })}
-        </div>
-      </section>
-
-      <div className="settings-footer">
-        <button className="settings-save-btn settings-save-main" onClick={handleSave}>
-          Save Changes
+        <button className="act-new-btn" onClick={openModal}>
+          + New Company
         </button>
-        {saved && <span className="settings-saved-msg">✓ Changes saved</span>}
       </div>
-    </section>
+
+      {/* Search */}
+      <div className="act-toolbar">
+        <input
+          className="act-search"
+          placeholder="Search company"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+
+      {/* Table */}
+      <div className="act-table-wrapper">
+        <table className="act-table">
+          <thead>
+            <tr>
+              <th>Company ID</th>
+              <th>Company Name</th>
+              <th>Code</th>
+              <th>City</th>
+              <th>State</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {filteredCompanies.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="act-empty">
+                  No companies found
+                </td>
+              </tr>
+            ) : (
+              filteredCompanies.map((company) => (
+                <tr key={company.id}>
+                  <td>{company.id}</td>
+                  <td>{company.name}</td>
+                  <td>{company.code}</td>
+                  <td>{company.city}</td>
+                  <td>{company.state}</td>
+
+                  <td>
+                    <div className="role-actions">
+                      <span
+                        className={
+                          company.status
+                            ? 'role-status role-status-active'
+                            : 'role-status role-status-inactive'
+                        }
+                      >
+                        {company.status ? 'Active' : 'Inactive'}
+                      </span>
+
+                      <label className="role-switch">
+                        <input
+                          type="checkbox"
+                          checked={company.status}
+                          onChange={() => toggleStatus(company.id)}
+                        />
+                        <span className="role-slider" />
+                      </label>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Modal */}
+      {modalOpen && (
+        <div className="act-modal-overlay" onClick={closeModal}>
+          <div
+            className="act-modal users-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="act-modal-header">
+              <h2>Add Company</h2>
+
+              <button
+                className="act-modal-close"
+                onClick={closeModal}
+              >
+                &times;
+              </button>
+            </div>
+
+            <form
+              className="act-modal-form"
+              onSubmit={handleSubmit}
+            >
+              {/* Row 1 */}
+              <div className="act-form-row">
+                <label className="act-form-field">
+                  <span>Company ID *</span>
+
+                  <input
+                    type="text"
+                    value={form.id}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        id: e.target.value,
+                      })
+                    }
+                  />
+                </label>
+
+                <label className="act-form-field">
+                  <span>Company Name *</span>
+
+                  <input
+                    type="text"
+                    value={form.name}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        name: e.target.value,
+                      })
+                    }
+                  />
+                </label>
+              </div>
+
+              {/* Row 2 */}
+              <div className="act-form-row">
+                <label className="act-form-field">
+                  <span>Company Code *</span>
+
+                  <input
+                    type="text"
+                    value={form.code}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        code: e.target.value,
+                      })
+                    }
+                  />
+                </label>
+
+                <label className="act-form-field">
+                  <span>Industry</span>
+
+                  <input
+                    type="text"
+                    value={form.industry}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        industry: e.target.value,
+                      })
+                    }
+                  />
+                </label>
+              </div>
+
+              {/* Row 3 */}
+              <div className="act-form-row">
+                <label className="act-form-field">
+                  <span>Company Phone</span>
+
+                  <input
+                    type="text"
+                    value={form.companyPhone}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        companyPhone: e.target.value,
+                      })
+                    }
+                  />
+                </label>
+
+                <label className="act-form-field">
+                  <span>City</span>
+
+                  <input
+                    type="text"
+                    value={form.city}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        city: e.target.value,
+                      })
+                    }
+                  />
+                </label>
+              </div>
+
+              {/* Row 4 */}
+              <div className="act-form-row">
+                <label className="act-form-field">
+                  <span>State</span>
+
+                  <input
+                    type="text"
+                    value={form.state}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        state: e.target.value,
+                      })
+                    }
+                  />
+                </label>
+
+                <label className="act-form-field">
+                  <span>Country</span>
+
+                  <input
+                    type="text"
+                    value={form.country}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        country: e.target.value,
+                      })
+                    }
+                  />
+                </label>
+              </div>
+
+              {/* Row 5 */}
+              <div className="act-form-row">
+                <label className="act-form-field">
+                  <span>Pincode</span>
+
+                  <input
+                    type="text"
+                    value={form.pincode}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        pincode: e.target.value,
+                      })
+                    }
+                  />
+                </label>
+
+                <label className="act-form-field">
+                  <span>Timezone</span>
+
+                  <input
+                    type="text"
+                    value={form.timezone}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        timezone: e.target.value,
+                      })
+                    }
+                  />
+                </label>
+              </div>
+
+              {error && (
+                <div className="form-error">
+                  {error}
+                </div>
+              )}
+
+              <div className="act-modal-actions">
+                <button
+                  type="button"
+                  className="act-cancel-btn"
+                  onClick={closeModal}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  className="act-submit-btn"
+                >
+                  Add Company
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }

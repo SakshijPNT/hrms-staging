@@ -45,7 +45,7 @@ public sealed class DatabaseSeeder(HrmsDbContext dbContext)
 
         var obsoleteActivities = currentActivities
             .Where(item => !expectedCodes.Contains(item.Code))
-            .ToList();
+            .ToList();  //remove old activities
 
         if (obsoleteActivities.Count > 0)
         {
