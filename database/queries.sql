@@ -140,6 +140,7 @@ CREATE TABLE leaveapplications (
     todate          DATE            NOT NULL,
     totaldays       NUMERIC(5,1)    NOT NULL,
     ishalfday       BOOLEAN        NOT NULL DEFAULT 0,
+    session         VARCHAR(20),
     reason          VARCHAR(500),
     approvalstatus  VARCHAR(20)     NOT NULL DEFAULT 'PENDING'
                         CHECK (approvalstatus IN ('PENDING','APPROVED','REJECTED','CANCELLED')),
@@ -154,7 +155,8 @@ CREATE TABLE leaveapplications (
     CONSTRAINT fk_la_user      FOREIGN KEY (userid)      REFERENCES usermaster(id),
     CONSTRAINT fk_la_leavetype FOREIGN KEY (leavetypeid) REFERENCES leavetypemaster(id),
     CONSTRAINT fk_la_approver  FOREIGN KEY (approvedby)  REFERENCES usermaster(id),
-    CONSTRAINT chk_la_dates    CHECK (todate >= fromdate)
+    CONSTRAINT chk_la_dates    CHECK (todate >= fromdate),
+    CONSTRAINT chk_la_session  CHECK (session IS NULL OR session IN ('FIRST_HALF','SECOND_HALF'))
 );
 
 CREATE INDEX idx_la_userid   ON leaveapplications(userid);

@@ -128,6 +128,7 @@ public class LeaveApplication
     public DateOnly ToDate { get; set; }
     public decimal TotalDays { get; set; }
     public bool IsHalfDay { get; set; }
+    public string? Session { get; set; }
     public string? Reason { get; set; }
     public string ApprovalStatus { get; set; } = "PENDING";
     public int? ApprovedBy { get; set; }
