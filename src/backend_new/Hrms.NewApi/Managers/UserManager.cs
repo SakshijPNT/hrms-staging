@@ -47,10 +47,7 @@ public class UserManager : IUserManager
         return MapUserResponse(user);
     }
 
-    public async Task<UserResponseDto> UpdateUserAsync(
-        int id,
-        UserUpsertDto request,
-        CancellationToken cancellationToken = default)
+    public async Task<UserResponseDto> UpdateUserAsync(int id,UserUpsertDto request,CancellationToken cancellationToken = default)
     {
         var user = await _dbContext.UserMasters.FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
             ?? throw new KeyNotFoundException($"User with id {id} does not exist.");
@@ -75,13 +72,23 @@ public class UserManager : IUserManager
         return MapUserResponse(user);
     }
 
-    public async Task<IReadOnlyList<CompanyUserListItemDto>> GetCompanyUsersAsync(
-        int companyId,
-        CancellationToken cancellationToken = default)
+    public async Task DeleteUserAsync(int id,int updatedBy,CancellationToken cancellationToken = default)
+    {
+        var user = await _dbContext.UserMasters.FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
+            ?? throw new KeyNotFoundException($"User with id {id} does not exist.");
+
+        user.StatusCode = 0;
+        user.UpdatedBy = updatedBy;
+        user.UpdatedOn = DateTimeOffset.UtcNow;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<CompanyUserListItemDto>> GetCompanyUsersAsync(int companyId,CancellationToken cancellationToken = default)
     {
         return await (
             from user in _dbContext.UserMasters.AsNoTracking()
-            where user.CompanyId == companyId
+            where user.CompanyId == companyId && user.StatusCode == 1
             join reportingManager in _dbContext.UserMasters.AsNoTracking()
                 on user.ManagerId equals reportingManager.Id into reportingManagers
             from reportingManager in reportingManagers.DefaultIfEmpty()
@@ -96,10 +103,21 @@ public class UserManager : IUserManager
             .ToListAsync(cancellationToken);
     }
 
-    private async Task ValidateUserReferencesAsync(
-        UserUpsertDto request,
-        int? currentUserId,
-        CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<ManagerListItemDto>> GetManagerListAsync(int companyId,CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.UserMasters
+            .AsNoTracking()
+            .Where(x => x.CompanyId == companyId && x.StatusCode == 1)
+            .OrderBy(x => x.FullName)
+            .Select(x => new ManagerListItemDto
+            {
+                Id = x.Id,
+                FullName = x.FullName,
+            })
+            .ToListAsync(cancellationToken);
+    }
+
+    private async Task ValidateUserReferencesAsync(UserUpsertDto request,int? currentUserId,CancellationToken cancellationToken)
     {
         var companyExists = await _dbContext.CompanyMasters.AnyAsync(x => x.Id == request.CompanyId, cancellationToken);
         if (!companyExists)
@@ -121,7 +139,7 @@ public class UserManager : IUserManager
             }
 
             var managerExists = await _dbContext.UserMasters.AnyAsync(
-                x => x.Id == request.ManagerId.Value,
+                x => x.Id == request.ManagerId.Value && x.StatusCode == 1,
                 cancellationToken);
             if (!managerExists)
             {
