@@ -192,6 +192,23 @@ public class UserLeaveManager : IUserLeaveManager
         }
     }
 
+    public async Task<IEnumerable<UserLeaveBalanceDTO>> GetUserLeaveBalances (int userId,int companyId,CancellationToken cancellationToken)
+    {
+        return await (
+            from balance in _dbContext.UserLeaveBalances.AsNoTracking()
+            where balance.UserId == userId && balance.StatusCode == 1
+            join leaveType in _dbContext.LeaveTypeMasters.AsNoTracking()
+                on balance.LeaveTypeId equals leaveType.Id
+            where leaveType.CompanyId == companyId && leaveType.StatusCode == 1
+            select new UserLeaveBalanceDTO
+            {
+                LeaveTypeId = balance.LeaveTypeId,
+                LeaveTypeName = leaveType.LeaveTypeName,
+                AvailableBalance = balance.AvailableBalance,
+            })
+            .ToListAsync(cancellationToken);
+    }
+
     private async Task ValidateLeaveBalanceAsync(
         int userId,
         int leaveTypeId,

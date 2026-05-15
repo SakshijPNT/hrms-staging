@@ -18,4 +18,8 @@ public interface IUserLeaveManager
         int leaveId,
         int userId,
         CancellationToken cancellationToken = default);
+
+        Task<IEnumerable<UserLeaveBalanceDTO>> GetUserLeaveBalances (int userId,int companyId,CancellationToken cancellationToken);
 }
+
+

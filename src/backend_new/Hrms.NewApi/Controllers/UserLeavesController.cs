@@ -65,6 +65,23 @@ public class UserLeavesController : ControllerBase
         return Ok(leaveApplications);
     }
 
+    [HttpGet("balances")]
+    public async Task<IActionResult> GetLeaveBalances(CancellationToken cancellationToken)
+    {
+        var session = GetSessionInfo();
+        if (session is null)
+        {
+            return Unauthorized(new { message = "No active session." });
+        }
+
+        var leaveBalances = await _userLeaveManager.GetUserLeaveBalances(
+            session.UserId,
+            session.CompanyId,
+            cancellationToken);
+
+        return Ok(leaveBalances);
+    }
+
     [HttpPatch("applications/{id:int}/cancel")]
     public async Task<IActionResult> CancelLeave(int id, CancellationToken cancellationToken)
     {
