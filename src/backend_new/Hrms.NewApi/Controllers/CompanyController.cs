@@ -1,0 +1,73 @@
+using System.Text.Json;
+using Hrms.NewApi.Dtos;
+using Hrms.NewApi.Interfaces;
+using Microsoft.AspNetCore.Mvc;
+
+namespace Hrms.NewApi.Controllers;
+
+[ApiController]
+[Route("api/[controller]")]
+public class CompanyController : ControllerBase
+{
+    private const string SessionKey = "UserSession";
+    private readonly ICompanyManager _companyManager;
+
+    public CompanyController(ICompanyManager companyManager)
+    {
+        _companyManager = companyManager;
+    }
+
+    [HttpPost("CreateCompany")]
+    public async Task<IActionResult> CreateCompany(
+        [FromBody] CompanyCreateDto request,
+        CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var session = GetSessionInfo();
+        if (session is null)
+        {
+            return Unauthorized(new { message = "No active session." });
+        }
+
+        try
+        {
+            var company = await _companyManager.CreateCompanyAsync(
+                request,
+                session.UserId,
+                cancellationToken);
+
+            return CreatedAtAction(nameof(GetCompanies), new { id = company.Id }, company);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpGet("GetCompanies")]
+    public async Task<IActionResult> GetCompanies(CancellationToken cancellationToken)
+    {
+        var session = GetSessionInfo();
+        if (session is null)
+        {
+            return Unauthorized(new { message = "No active session." });
+        }
+
+        var companies = await _companyManager.GetCompaniesAsync(
+            session.CompanyId,
+            session.RoleId,
+            cancellationToken);
+
+        return Ok(companies);
+    }
+
+    private SessionInfoDto? GetSessionInfo()
+    {
+        var rawSession = HttpContext.Session.GetString(SessionKey);
+        return rawSession is null ? null : JsonSerializer.Deserialize<SessionInfoDto>(rawSession);
+    }
+}

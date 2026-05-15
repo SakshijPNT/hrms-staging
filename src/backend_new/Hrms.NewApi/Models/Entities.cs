@@ -82,6 +82,7 @@ public class ModuleMaster
 {
     public int Id { get; set; }
     public string ModuleName { get; set; } = null!;
+    public int? ParentModuleId { get; set; }
     public string? Description { get; set; }
     public string? IconUrl { get; set; }
     public short StatusCode { get; set; } = 1;
@@ -89,6 +90,10 @@ public class ModuleMaster
     public DateTimeOffset CreatedOn { get; set; }
     public int UpdatedBy { get; set; }
     public DateTimeOffset UpdatedOn { get; set; }
+    public ModuleMaster? ParentModule { get; set; }
+
+    public ICollection<ModuleMaster> SubModules { get; set; }
+        = new List<ModuleMaster>();
 }
 
 public class ActivityModuleMapping

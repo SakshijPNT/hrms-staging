@@ -72,13 +72,27 @@ public class HrmsDbContext : DbContext
 
         modelBuilder.Entity<ModuleMaster>(entity =>
         {
-            entity.ToTable("modulemaster");
+            entity.ToTable("modulemaster", t =>
+            {
+                t.HasCheckConstraint(
+                    "chk_modulemaster_parent_not_self",
+                    "parentmoduleid IS NULL OR parentmoduleid <> id");
+            });
+            entity.Property(x => x.ParentModuleId).HasColumnName("parentmoduleid");
             entity.Property(x => x.ModuleName).IsRequired().HasMaxLength(100);
             entity.Property(x => x.Description).HasMaxLength(255);
             entity.Property(x => x.IconUrl).HasMaxLength(255);
             entity.Property(x => x.StatusCode).IsRequired().HasDefaultValue((short)1);
             entity.Property(x => x.CreatedOn).HasDefaultValueSql("NOW()");
             entity.Property(x => x.UpdatedOn).HasDefaultValueSql("NOW()");
+
+            entity.HasIndex(x => x.ParentModuleId).HasDatabaseName("ix_modulemaster_parentmoduleid");
+
+            entity.HasOne(x => x.ParentModule)
+                .WithMany(x => x.SubModules)
+                .HasForeignKey(x => x.ParentModuleId)
+                .HasConstraintName("fk_modulemaster_parent")
+                .OnDelete(DeleteBehavior.NoAction);
         });
 
         modelBuilder.Entity<UserMaster>(entity =>

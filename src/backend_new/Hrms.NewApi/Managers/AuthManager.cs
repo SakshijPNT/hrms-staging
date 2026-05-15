@@ -56,18 +56,16 @@ public class AuthManager : IAuthManager
 
         var activityIds = activities.Select(a => a.Id).ToHashSet();
 
-        var modules = await (
-            from amm in _db.ActivityModuleMappings
-            join mm in _db.ModuleMasters on amm.ModuleId equals mm.Id
-            where activityIds.Contains(amm.ActivityId) && amm.StatusCode == 1 && mm.StatusCode == 1
-            select new ModuleDto
+        var modules = await _db.ModuleMasters.AsNoTracking()
+            .Where(mm => mm.StatusCode == 1)
+            .Select(mm => new ModuleDto
             {
                 Id = mm.Id,
                 ModuleName = mm.ModuleName,
                 Description = mm.Description,
                 IconUrl = mm.IconUrl,
             }
-        ).AsNoTracking().Distinct().ToListAsync(cancellationToken);
+        ).ToListAsync(cancellationToken);
 
         var session = new SessionInfoDto
         {
