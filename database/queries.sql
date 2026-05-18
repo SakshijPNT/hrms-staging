@@ -88,6 +88,7 @@ CREATE TABLE activityrolemapping (
 
 CREATE TABLE modulemaster (
     id          SERIAL          NOT NULL PRIMARY KEY,
+    parentmoduleid INT,
     modulename  VARCHAR(100)    NOT NULL,
     description VARCHAR(255),
     iconurl     VARCHAR(255),
@@ -95,8 +96,14 @@ CREATE TABLE modulemaster (
     createdby    INT             NOT NULL,
     createdon    TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
     updatedby    INT             NOT NULL,
-    updatedon    TIMESTAMPTZ     NOT NULL DEFAULT NOW()
+    updatedon    TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+    CONSTRAINT fk_modulemaster_parent
+        FOREIGN KEY (parentmoduleid) REFERENCES modulemaster(id),
+    CONSTRAINT chk_modulemaster_parent_not_self
+        CHECK (parentmoduleid IS NULL OR parentmoduleid <> id)
 );
+
+CREATE INDEX ix_modulemaster_parentmoduleid ON modulemaster(parentmoduleid);
 
 
 CREATE TABLE activitymodulemapping (

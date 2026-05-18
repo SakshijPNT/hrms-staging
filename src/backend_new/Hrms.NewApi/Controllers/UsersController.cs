@@ -60,16 +60,10 @@ public class UsersController : ControllerBase
     [HttpGet("company")]
     public async Task<IActionResult> GetCompanyUsers(CancellationToken cancellationToken)
     {
-        var rawSession = HttpContext.Session.GetString(SessionKey);
-        if (rawSession is null)
-        {
-            return Unauthorized(new { message = "No active session." });
-        }
-
-        var session = JsonSerializer.Deserialize<SessionInfoDto>(rawSession);
+        var session = GetSessionInfo();
         if (session is null)
         {
-            return Unauthorized(new { message = "Invalid session." });
+            return Unauthorized(new { message = "No active session." });
         }
 
         var users = await _userManager.GetCompanyUsersAsync(session.CompanyId, cancellationToken);
@@ -104,11 +98,50 @@ public async Task<IActionResult> UpdateUserStatus(
     }
 }
 
+    [HttpDelete("{id:int}")]
+    public async Task<IActionResult> DeleteUser(int id, CancellationToken cancellationToken)
+    {
+        var session = GetSessionInfo();
+        if (session is null)
+        {
+            return Unauthorized(new { message = "No active session." });
+        }
+
+        try
+        {
+            await _userManager.DeleteUserAsync(id, session.UserId, cancellationToken);
+            return NoContent();
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+    }
+
+    [HttpGet("managers")]
+    public async Task<IActionResult> GetManagerList(CancellationToken cancellationToken)
+    {
+        var session = GetSessionInfo();
+        if (session is null)
+        {
+            return Unauthorized(new { message = "No active session." });
+        }
+
+        var managers = await _userManager.GetManagerListAsync(session.CompanyId, cancellationToken);
+        return Ok(managers);
+    }
+
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetUserById(int id)
     {
         // This endpoint is currently used only for CreatedAtAction location creation.
         // The actual data can be returned by implementing a full query method later.
         return Ok(new { Id = id });
+    }
+
+    private SessionInfoDto? GetSessionInfo()
+    {
+        var rawSession = HttpContext.Session.GetString(SessionKey);
+        return rawSession is null ? null : JsonSerializer.Deserialize<SessionInfoDto>(rawSession);
     }
 }

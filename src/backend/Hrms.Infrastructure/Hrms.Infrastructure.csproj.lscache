@@ -107,7 +107,7 @@ Services/
 ../
  Hrms.Application/obj/Debug/net10.0/ref/Hrms.Application.dll
  Hrms.Domain/obj/Debug/net10.0/ref/Hrms.Domain.dll
-<DOTNET>/packs/Microsoft.AspNetCore.App.Ref/10.0.0/ref/net10.0/
+<DOTNET>/packs/Microsoft.AspNetCore.App.Ref/10.0.7/ref/net10.0/
  Microsoft.AspNetCore.Antiforgery.dll
  Microsoft.AspNetCore.Authentication.Abstractions.dll
  Microsoft.AspNetCore.Authentication.BearerToken.dll
@@ -195,6 +195,9 @@ Services/
  Microsoft.AspNetCore.StaticFiles.dll
  Microsoft.AspNetCore.WebSockets.dll
  Microsoft.AspNetCore.WebUtilities.dll
+ Microsoft.Extensions.Caching.Abstractions.dll
+ Microsoft.Extensions.Caching.Memory.dll
+ Microsoft.Extensions.Configuration.Abstractions.dll
  Microsoft.Extensions.Configuration.Binder.dll
  Microsoft.Extensions.Configuration.CommandLine.dll
  Microsoft.Extensions.Configuration.dll
@@ -205,6 +208,8 @@ Services/
  Microsoft.Extensions.Configuration.KeyPerFile.dll
  Microsoft.Extensions.Configuration.UserSecrets.dll
  Microsoft.Extensions.Configuration.Xml.dll
+ Microsoft.Extensions.DependencyInjection.Abstractions.dll
+ Microsoft.Extensions.DependencyInjection.dll
  Microsoft.Extensions.Diagnostics.Abstractions.dll
  Microsoft.Extensions.Diagnostics.dll
  Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions.dll
@@ -222,15 +227,19 @@ Services/
  Microsoft.Extensions.Identity.Stores.dll
  Microsoft.Extensions.Localization.Abstractions.dll
  Microsoft.Extensions.Localization.dll
+ Microsoft.Extensions.Logging.Abstractions.dll
  Microsoft.Extensions.Logging.Configuration.dll
  Microsoft.Extensions.Logging.Console.dll
  Microsoft.Extensions.Logging.Debug.dll
+ Microsoft.Extensions.Logging.dll
  Microsoft.Extensions.Logging.EventLog.dll
  Microsoft.Extensions.Logging.EventSource.dll
  Microsoft.Extensions.Logging.TraceSource.dll
  Microsoft.Extensions.ObjectPool.dll
  Microsoft.Extensions.Options.ConfigurationExtensions.dll
  Microsoft.Extensions.Options.DataAnnotations.dll
+ Microsoft.Extensions.Options.dll
+ Microsoft.Extensions.Primitives.dll
  Microsoft.Extensions.Validation.dll
  Microsoft.Extensions.WebEncoders.dll
  Microsoft.JSInterop.dll
@@ -239,7 +248,7 @@ Services/
  System.Formats.Cbor.dll
  System.Security.Cryptography.Xml.dll
  System.Threading.RateLimiting.dll
-<DOTNET>/packs/Microsoft.NETCore.App.Ref/10.0.0/ref/net10.0/
+<DOTNET>/packs/Microsoft.NETCore.App.Ref/10.0.7/ref/net10.0/
  Microsoft.CSharp.dll
  Microsoft.VisualBasic.Core.dll
  Microsoft.VisualBasic.dll
@@ -413,15 +422,6 @@ Services/
  microsoft.entityframeworkcore.abstractions/10.0.4/lib/net10.0/Microsoft.EntityFrameworkCore.Abstractions.dll
  microsoft.entityframeworkcore.relational/10.0.4/lib/net10.0/Microsoft.EntityFrameworkCore.Relational.dll
  microsoft.entityframeworkcore/10.0.4/lib/net10.0/Microsoft.EntityFrameworkCore.dll
- microsoft.extensions.caching.abstractions/10.0.4/lib/net10.0/Microsoft.Extensions.Caching.Abstractions.dll
- microsoft.extensions.caching.memory/10.0.4/lib/net10.0/Microsoft.Extensions.Caching.Memory.dll
- microsoft.extensions.configuration.abstractions/10.0.4/lib/net10.0/Microsoft.Extensions.Configuration.Abstractions.dll
- microsoft.extensions.dependencyinjection.abstractions/10.0.7/lib/net10.0/Microsoft.Extensions.DependencyInjection.Abstractions.dll
- microsoft.extensions.dependencyinjection/10.0.4/lib/net10.0/Microsoft.Extensions.DependencyInjection.dll
- microsoft.extensions.logging.abstractions/10.0.4/lib/net10.0/Microsoft.Extensions.Logging.Abstractions.dll
- microsoft.extensions.logging/10.0.4/lib/net10.0/Microsoft.Extensions.Logging.dll
- microsoft.extensions.options/10.0.4/lib/net10.0/Microsoft.Extensions.Options.dll
- microsoft.extensions.primitives/10.0.4/lib/net10.0/Microsoft.Extensions.Primitives.dll
  microsoft.identitymodel.abstractions/8.0.1/lib/net9.0/Microsoft.IdentityModel.Abstractions.dll
  microsoft.identitymodel.jsonwebtokens/8.0.1/lib/net9.0/Microsoft.IdentityModel.JsonWebTokens.dll
  microsoft.identitymodel.logging/8.0.1/lib/net9.0/Microsoft.IdentityModel.Logging.dll
@@ -433,30 +433,29 @@ Services/
  system.identitymodel.tokens.jwt/8.0.1/lib/net9.0/System.IdentityModel.Tokens.Jwt.dll
 
 [analyzerReferences]
-<DOTNET>/packs/Microsoft.AspNetCore.App.Ref/10.0.0/analyzers/dotnet/cs/
+<DOTNET>/packs/Microsoft.AspNetCore.App.Ref/10.0.7/analyzers/dotnet/cs/
  Microsoft.AspNetCore.App.Analyzers.dll
  Microsoft.AspNetCore.App.CodeFixes.dll
  Microsoft.AspNetCore.App.SourceGenerators.dll
  Microsoft.AspNetCore.Components.Analyzers.dll
+ Microsoft.Extensions.Logging.Generators.dll
+ Microsoft.Extensions.Options.SourceGeneration.dll
  Microsoft.Extensions.Validation.ValidationsGenerator.dll
-<DOTNET>/packs/Microsoft.NETCore.App.Ref/10.0.0/analyzers/dotnet/cs/
+<DOTNET>/packs/Microsoft.NETCore.App.Ref/10.0.7/analyzers/dotnet/cs/
  Microsoft.Interop.ComInterfaceGenerator.dll
  Microsoft.Interop.JavaScript.JSImportGenerator.dll
  Microsoft.Interop.LibraryImportGenerator.dll
  Microsoft.Interop.SourceGeneration.dll
  System.Text.Json.SourceGeneration.dll
  System.Text.RegularExpressions.Generator.dll
-<DOTNET>/sdk/10.0.100/Sdks/Microsoft.NET.Sdk/analyzers/
+<DOTNET>/sdk/10.0.107/Sdks/Microsoft.NET.Sdk/analyzers/
  Microsoft.CodeAnalysis.CSharp.NetAnalyzers.dll
  Microsoft.CodeAnalysis.NetAnalyzers.dll
 <NUGET>/microsoft.codeanalysis.analyzers/3.11.0/analyzers/dotnet/cs/
  Microsoft.CodeAnalysis.Analyzers.dll
  Microsoft.CodeAnalysis.CSharp.Analyzers.dll
-<NUGET>/
- microsoft.entityframeworkcore.analyzers/10.0.4/analyzers/dotnet/cs/Microsoft.EntityFrameworkCore.Analyzers.dll
- microsoft.extensions.logging.abstractions/10.0.4/analyzers/dotnet/roslyn4.4/cs/Microsoft.Extensions.Logging.Generators.dll
- microsoft.extensions.options/10.0.4/analyzers/dotnet/roslyn4.4/cs/Microsoft.Extensions.Options.SourceGeneration.dll
+<NUGET>/microsoft.entityframeworkcore.analyzers/10.0.4/analyzers/dotnet/cs/Microsoft.EntityFrameworkCore.Analyzers.dll
 
 [analyzerConfigFiles]
-<DOTNET>/sdk/10.0.100/Sdks/Microsoft.NET.Sdk/analyzers/build/config/analysislevel_10_default.globalconfig
+<DOTNET>/sdk/10.0.107/Sdks/Microsoft.NET.Sdk/analyzers/build/config/analysislevel_10_default.globalconfig
 obj/Debug/net10.0/Hrms.Infrastructure.GeneratedMSBuildEditorConfig.editorconfig

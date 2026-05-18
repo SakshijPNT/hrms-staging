@@ -18,7 +18,7 @@ public class AuthManager : IAuthManager
         _passwordHasher = passwordHasher;
     }
 
-    public async Task<SessionInfoDto> LoginAsync(LoginRequestDto request, CancellationToken cancellationToken = default)
+    public async Task<(SessionInfoDto Session, LoginResponseDto Response)> LoginAsync(LoginRequestDto request, CancellationToken cancellationToken = default)
     {
         var user = await _db.UserMasters
             .AsNoTracking()
@@ -41,7 +41,33 @@ public class AuthManager : IAuthManager
             .Select(r => r.RoleName)
             .FirstAsync(cancellationToken);
 
-        return new SessionInfoDto
+        var activities = await (
+            from arm in _db.ActivityRoleMappings
+            join am in _db.ActivityMasters on arm.ActivityId equals am.Id
+            where arm.RoleId == user.RoleId && arm.StatusCode == 1 && am.StatusCode == 1
+            select new ActivityDto
+            {
+                Id = am.Id,
+                ActivityCode = am.ActivityCode,
+                ActivityName = am.ActivityName,
+                Description = am.Description,
+            }
+        ).AsNoTracking().ToListAsync(cancellationToken);
+
+        var activityIds = activities.Select(a => a.Id).ToHashSet();
+
+        var modules = await _db.ModuleMasters.AsNoTracking()
+            .Where(mm => mm.StatusCode == 1)
+            .Select(mm => new ModuleDto
+            {
+                Id = mm.Id,
+                ModuleName = mm.ModuleName,
+                Description = mm.Description,
+                IconUrl = mm.IconUrl,
+            }
+        ).ToListAsync(cancellationToken);
+
+        var session = new SessionInfoDto
         {
             UserId = user.Id,
             FullName = user.FullName,
@@ -51,5 +77,13 @@ public class AuthManager : IAuthManager
             RoleId = user.RoleId,
             RoleName = role,
         };
+
+        var response = new LoginResponseDto
+        {
+            Modules = modules,
+            Activities = activities,
+        };
+
+        return (session, response);
     }
 }

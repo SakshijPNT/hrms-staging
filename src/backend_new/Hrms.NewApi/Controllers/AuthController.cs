@@ -25,9 +25,9 @@ public class AuthController : ControllerBase
 
         try
         {
-            var sessionInfo = await _authManager.LoginAsync(request, cancellationToken);
+            var (sessionInfo, loginResponse) = await _authManager.LoginAsync(request, cancellationToken);
             HttpContext.Session.SetString(SessionKey, JsonSerializer.Serialize(sessionInfo));
-            return Ok(sessionInfo);
+            return Ok(loginResponse);
         }
         catch (UnauthorizedAccessException ex)
         {
