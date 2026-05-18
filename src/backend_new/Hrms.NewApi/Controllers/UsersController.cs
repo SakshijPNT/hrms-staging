@@ -3,6 +3,8 @@ using Hrms.NewApi.Dtos;
 using Hrms.NewApi.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 
+
+
 namespace Hrms.NewApi.Controllers;
 
 [ApiController]
@@ -73,6 +75,34 @@ public class UsersController : ControllerBase
         var users = await _userManager.GetCompanyUsersAsync(session.CompanyId, cancellationToken);
         return Ok(users);
     }
+
+    [HttpPut("{id:int}/status")]
+public async Task<IActionResult> UpdateUserStatus(
+    int id,
+    [FromBody] UpdateStatusDto request,
+    CancellationToken cancellationToken)
+{
+    try
+    {
+        await _userManager.UpdateUserStatusAsync(
+            id,
+            request.StatusCode,
+            cancellationToken
+        );
+
+        return Ok(new
+        {
+            message = "User status updated successfully."
+        });
+    }
+    catch (KeyNotFoundException ex)
+    {
+        return NotFound(new
+        {
+            message = ex.Message
+        });
+    }
+}
 
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetUserById(int id)

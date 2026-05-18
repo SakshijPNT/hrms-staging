@@ -75,27 +75,50 @@ public class UserManager : IUserManager
         return MapUserResponse(user);
     }
 
-    public async Task<IReadOnlyList<CompanyUserListItemDto>> GetCompanyUsersAsync(
-        int companyId,
-        CancellationToken cancellationToken = default)
-    {
-        return await (
-            from user in _dbContext.UserMasters.AsNoTracking()
-            where user.CompanyId == companyId
-            join reportingManager in _dbContext.UserMasters.AsNoTracking()
-                on user.ManagerId equals reportingManager.Id into reportingManagers
-            from reportingManager in reportingManagers.DefaultIfEmpty()
-            orderby user.FullName
-            select new CompanyUserListItemDto
-            {
-                FullName = user.FullName,
-                EmailId = user.EmailId,
-                ReportingManagerEmailId = reportingManager == null ? null : reportingManager.EmailId,
-                JoiningDate = user.JoiningDate,
-            })
-            .ToListAsync(cancellationToken);
-    }
+public async Task<IReadOnlyList<CompanyUserListItemDto>> GetCompanyUsersAsync(
+    int companyId,
+    CancellationToken cancellationToken = default)
+{
+    return await (
+        from user in _dbContext.UserMasters.AsNoTracking()
 
+        where user.CompanyId == companyId
+
+        join reportingManager in _dbContext.UserMasters.AsNoTracking()
+            on user.ManagerId equals reportingManager.Id
+            into reportingManagers
+
+        from reportingManager in reportingManagers.DefaultIfEmpty()
+
+        orderby user.FullName
+
+        select new CompanyUserListItemDto
+        {
+            Id = user.Id,
+
+            FullName = user.FullName,
+
+            EmailId = user.EmailId,
+
+            RoleId = user.RoleId,
+
+            ManagerId = user.ManagerId,
+
+            ReportingManagerEmailId =
+                reportingManager == null
+                    ? null
+                    : reportingManager.EmailId,
+
+            JoiningDate = user.JoiningDate,
+
+            ProbationMonths = user.ProbationMonths,
+
+            ConfirmationDate = user.ConfirmationDate,
+
+            StatusCode = user.StatusCode
+        })
+        .ToListAsync(cancellationToken);
+}
     private async Task ValidateUserReferencesAsync(
         UserUpsertDto request,
         int? currentUserId,
@@ -156,4 +179,24 @@ public class UserManager : IUserManager
             UpdatedOn = user.UpdatedOn,
         };
     }
+
+    public async Task UpdateUserStatusAsync(
+    int id,
+    int statusCode,
+    CancellationToken cancellationToken = default)
+{
+    var user = await _dbContext.UserMasters
+        .FirstOrDefaultAsync(
+            x => x.Id == id,
+            cancellationToken)
+        ?? throw new KeyNotFoundException(
+            $"User with id {id} does not exist.");
+
+    user.StatusCode = (short)statusCode;
+
+    user.UpdatedOn = DateTimeOffset.UtcNow;
+
+    await _dbContext.SaveChangesAsync(
+        cancellationToken);
+}
 }

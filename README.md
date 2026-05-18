@@ -67,7 +67,7 @@ dotnet run
 
 Local endpoints:
 
-- HTTP: `http://localhost:5085`
+- HTTP: `http://localhost:6001`
 - HTTPS: `https://localhost:7004`
 - Swagger UI: `https://localhost:7004/swagger`
 
@@ -119,7 +119,7 @@ Validated locally in this workspace:
 ## Frontend Notes
 
 - Sidebar includes Dashboard, Attendance, Requests, My Profile, and Logout.
-- Topbar shows the logged-in user name and email.
+- Topbar shows the logged-in user name and EmailId.
 - Requests page includes a phase-one request submission form.
 - Attendance and profile pages consume live API data.
 

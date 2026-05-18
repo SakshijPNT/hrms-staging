@@ -29,9 +29,9 @@ PNTHR HRMS (Human Resource Management System) is a full-stack web application bu
 ```
 Browser (React)
     │
-    │  HTTP/JSON  (port 5173 → 5085)
+    │  HTTP/JSON  (port 5173 → 6001)
     ▼
-.NET Web API  (port 5085)
+.NET Web API  (port 6001)
     │
     ├── Hrms.Api           → Controllers, routing, Swagger
     ├── Hrms.Application   → DTOs, service interfaces, business rules
@@ -54,7 +54,7 @@ The backend follows **Clean Architecture** — the Domain has no dependencies, A
 - **Authentication:** Auth context stores the JWT token in memory; protected routes redirect unauthenticated users to `/login`
 - **API Communication:** Axios sends requests to the backend; the base URL is configured via `.env` file
 - **Pages built:** Login, Dashboard, Attendance, Requests, My Profile
-- **Config file:** `src/frontend/hrms-web/.env` — contains `VITE_API_BASE_URL=http://localhost:5085/api`
+- **Config file:** `src/frontend/hrms-web/.env` — contains `VITE_API_BASE_URL=http://localhost:6001/api`
 - **Run command:** `npm run dev` inside `src/frontend/hrms-web/`
 - **Access URL:** http://localhost:5173
 
@@ -72,8 +72,8 @@ The backend follows **Clean Architecture** — the Domain has no dependencies, A
 - **Password Security:** BCrypt — passwords are salted and hashed before being stored
 - **Config file:** `src/backend/Hrms.Api/appsettings.json` — contains connection string and JWT settings
 - **Run command:** `dotnet run --project src/backend/Hrms.Api`
-- **Access URL:** http://localhost:5085
-- **Swagger UI:** http://localhost:5085/swagger
+- **Access URL:** http://localhost:6001
+- **Swagger UI:** http://localhost:6001/swagger
 
 ---
 
@@ -108,7 +108,7 @@ Host=localhost;Port=5432;Database=postgres;Username=postgres;Password=root
 
 ## Seeded Demo Accounts
 
-| Role     | Email                      | Password      |
+| Role     | EmailId                      | Password      |
 |----------|----------------------------|---------------|
 | Admin    | admin@pnthrhrms.com        | Admin@123     |
 | Employee | employee@pnthrhrms.com     | Employee@123  |
@@ -133,7 +133,7 @@ npm run dev
 
 ### Step 3 – Open in Browser
 - Application: http://localhost:5173/login
-- API Docs:     http://localhost:5085/swagger
+- API Docs:     http://localhost:6001/swagger
 
 ---
 
@@ -151,7 +151,7 @@ npm run dev
 | GET    | /api/profile/me                 | My profile details           |
 | PUT    | /api/profile/me                 | Update my profile            |
 
-Full API documentation available at: http://localhost:5085/swagger
+Full API documentation available at: http://localhost:6001/swagger
 
 ---
 

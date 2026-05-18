@@ -1,7 +1,7 @@
 import axios from 'axios'
 import { getStoredSession } from '../auth/tokenStorage'
 
-const baseURL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5085/api'
+const baseURL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:6001/api'
 
 export const httpClient = axios.create({
   baseURL,

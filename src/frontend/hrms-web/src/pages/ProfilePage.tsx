@@ -48,8 +48,8 @@ export function ProfilePage() {
 
       <div className="profile-grid">
         <article>
-          <span>Email</span>
-          <strong>{profile.email}</strong>
+          <span>EmailId</span>
+          <strong>{profile.EmailId}</strong>
         </article>
         <article>
           <span>Role</span>

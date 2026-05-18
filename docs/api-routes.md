@@ -2,7 +2,7 @@
 
 Base URL during local development:
 
-- `http://localhost:5085/api`
+- `http://localhost:6001/api`
 
 Authentication:
 
@@ -11,7 +11,7 @@ Authentication:
   - Request body:
     ```json
     {
-      "email": "admin@pnthrhrms.com",
+      "EmailId": "admin@pnthrhrms.com",
       "password": "Admin@123"
     }
     ```

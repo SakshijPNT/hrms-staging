@@ -9,4 +9,6 @@ public class RoleResponseDto
     public short StatusCode { get; set; }
     public DateTimeOffset CreatedOn { get; set; }
     public DateTimeOffset UpdatedOn { get; set; }
+
+        public List<int> ActivityIds { get; set; } = new();
 }

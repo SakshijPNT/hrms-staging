@@ -6,7 +6,7 @@ import { useAuth } from '../auth/AuthContext'
 export function LoginPage() {
   const navigate = useNavigate()
   const { login } = useAuth()
-  const [email, setEmail] = useState('')
+  const [EmailId, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -17,7 +17,7 @@ export function LoginPage() {
     setError('')
 
     try {
-      await login({ email: email.trim(), password })
+      await login({ EmailId: EmailId.trim(), password })
       startTransition(() => navigate('/dashboard', { replace: true }))
     } catch (requestError) {
       if (requestError instanceof AxiosError) {
@@ -69,10 +69,10 @@ export function LoginPage() {
 
         <form className="login-form" onSubmit={handleSubmit}>
           <label>
-            <span>Email</span>
+            <span>EmailId</span>
             <input
-              type="email"
-              value={email}
+              type="EmailId"
+              value={EmailId}
               onChange={(event) => setEmail(event.target.value)}
               placeholder="name@company.com"
               autoComplete="off"

@@ -6,7 +6,7 @@ public sealed class CompanyUserDto
     public string FirstName { get; init; } = string.Empty;
     public string LastName { get; init; } = string.Empty;
     public string FullName { get; init; } = string.Empty;
-    public string Email { get; init; } = string.Empty;
+    public string EmailId { get; init; } = string.Empty;
     public string EmployeeCode { get; init; } = string.Empty;
     public string Department { get; init; } = string.Empty;
     public string JobTitle { get; init; } = string.Empty;

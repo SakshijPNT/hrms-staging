@@ -31,7 +31,7 @@ export function Topbar() {
       <div className="topbar-user">
         <div className="topbar-user-copy">
           <strong>{session?.user.fullName}</strong>
-          <span>{session?.user.email}</span>
+          <span>{session?.user.EmailId}</span>
         </div>
         <div className="topbar-avatar">
           {session?.user.fullName

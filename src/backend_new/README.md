@@ -288,7 +288,7 @@ UsersController.CreateUser(...)
     calls IUserManager.CreateUserAsync(...)
 
 UserManager.CreateUserAsync(...)
-    validates company, role, manager, and duplicate email
+    validates company, role, manager, and duplicate EmailId
     hashes the password using ASP.NET Core PasswordHasher
     creates UserMaster entity
     saves through HrmsDbContext.UserMasters

@@ -4,8 +4,8 @@ namespace Hrms.Application.DTOs.Administration;
 
 public sealed class CreateCompanyUserRequestDto
 {
-    [Required, EmailAddress]
-    public string Email { get; init; } = string.Empty;
+    [Required, EmailIdAddress]
+    public string EmailId { get; init; } = string.Empty;
 
     [Required]
     public string FirstName { get; init; } = string.Empty;

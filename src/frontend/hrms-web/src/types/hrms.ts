@@ -1,6 +1,6 @@
 export interface AuthenticatedUser { //“Data will come in this format”
   id: string
-  email: string
+  EmailId: string
   fullName: string
   role: string
   employeeCode: string
@@ -15,7 +15,7 @@ export interface AuthResponse {
 }
 
 export interface LoginPayload {
-  email: string
+  EmailId: string
   password: string
 }
 
@@ -120,7 +120,7 @@ export interface CompanyUser {
   firstName: string
   lastName: string
   fullName: string
-  email: string
+  EmailId: string
   employeeCode: string
   department: string
   jobTitle: string
@@ -133,7 +133,7 @@ export interface CompanyUser {
 }
 
 export interface CreateCompanyUserPayload {
-  email: string
+  EmailId: string
   firstName: string
   lastName: string
   department: string
@@ -144,7 +144,7 @@ export interface CreateCompanyUserPayload {
 }
 
 export interface UpdateCompanyUserPayload {
-  email: string
+  EmailId: string
   firstName: string
   lastName: string
   employeeCode: string
@@ -158,7 +158,7 @@ export interface UpdateCompanyUserPayload {
 export interface EmployeeProfile {
   userId: string
   fullName: string
-  email: string
+  EmailId: string
   role: string
   employeeCode: string
   department: string

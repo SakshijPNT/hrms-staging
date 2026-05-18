@@ -1,4 +1,4 @@
-@Hrms.Api_HostAddress = http://localhost:5085
+@Hrms.Api_HostAddress = http://localhost:6001
 
 GET {{Hrms.Api_HostAddress}}/weatherforecast/
 Accept: application/json

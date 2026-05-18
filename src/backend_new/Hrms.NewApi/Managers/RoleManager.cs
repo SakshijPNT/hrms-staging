@@ -38,8 +38,40 @@ public class RoleManager : IRoleManager
         _dbContext.RoleMasters.Add(role);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        return MapRoleResponse(role);
+
+        // 2️⃣ Map the Activity Names to your mappings table
+    if (request.ActivityIds.Any())
+{
+    var activitiesFromDb = await _dbContext.ActivityMasters
+        .Where(a => request.ActivityIds.Contains(a.Id))
+        .ToListAsync(cancellationToken);
+
+    foreach (var activity in activitiesFromDb)
+    {
+        var mapping = new ActivityRoleMapping
+        {
+            RoleId = role.Id,
+            ActivityId = activity.Id,
+            StatusCode = 1,
+            CreatedBy = request.CreatedBy,
+            CreatedOn = DateTimeOffset.UtcNow,
+            UpdatedBy = request.UpdatedBy,
+            UpdatedOn = DateTimeOffset.UtcNow
+        };
+
+        _dbContext.ActivityRoleMappings.Add(mapping);
     }
+
+    await _dbContext.SaveChangesAsync(cancellationToken);
+}
+    // 3Map response and include the string list of activities for the UI
+    var response = MapRoleResponse(role);
+    response.ActivityIds = request.ActivityIds;
+    return response;
+}
+
+        //return MapRoleResponse(role);
+    //}
 
     public async Task<RoleResponseDto> UpdateRoleAsync(
         int id,
@@ -71,7 +103,7 @@ public class RoleManager : IRoleManager
     {
         return await _dbContext.RoleMasters
             .AsNoTracking()
-            .Where(x => x.CompanyId == companyId)
+            .Where(x => x.CompanyId == companyId )
             .OrderBy(x => x.RoleName)
             .Select(x => new RoleResponseDto
             {
@@ -82,7 +114,12 @@ public class RoleManager : IRoleManager
                 StatusCode = x.StatusCode,
                 CreatedOn = x.CreatedOn,
                 UpdatedOn = x.UpdatedOn,
-            })
+
+                ActivityIds = _dbContext.ActivityRoleMappings
+                .Where(a => a.RoleId == x.Id)
+                .Select(a => a.ActivityId)
+                .ToList()
+                })
             .ToListAsync(cancellationToken);
     }
 
@@ -134,9 +171,34 @@ public class RoleManager : IRoleManager
             cancellationToken)
         ?? throw new KeyNotFoundException($"Role with id {id} does not exist");
 
-    _dbContext.RoleMasters.Remove(role);
+  
+    role.StatusCode = 0;
+
+    role.UpdatedOn = DateTimeOffset.UtcNow;
 
     await _dbContext.SaveChangesAsync(cancellationToken);
+}
+
+public async Task SetRoleStatusAsync(
+    int id,
+    int companyId,
+    int statusCode,
+    CancellationToken cancellationToken = default)
+{
+    var role = await _dbContext.RoleMasters
+        .FirstOrDefaultAsync(
+            x => x.Id == id &&
+                 x.CompanyId == companyId,
+            cancellationToken)
+        ?? throw new KeyNotFoundException(
+            $"Role with id {id} does not exist");
+
+            role.StatusCode = (short)statusCode;
+
+    role.UpdatedOn = DateTimeOffset.UtcNow;
+
+    await _dbContext.SaveChangesAsync(
+        cancellationToken);
 }
 
 

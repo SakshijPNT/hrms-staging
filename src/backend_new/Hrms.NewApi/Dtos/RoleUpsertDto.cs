@@ -16,4 +16,6 @@ public class RoleUpsertDto
     public short StatusCode { get; set; } = 1;
     public int CreatedBy { get; set; }
     public int UpdatedBy { get; set; }
+
+    public List<int> ActivityIds { get; set; } = new();
 }
