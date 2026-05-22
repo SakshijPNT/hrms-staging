@@ -1,0 +1,736 @@
+import Layout from './Layout'
+import '../styles/Style.css'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import api from '../services/api'
+import type { AxiosError } from 'axios'
+
+interface LeaveBalance {
+  leaveTypeId: number
+  leaveTypeName: string
+  availableBalance: number
+}
+
+interface LeaveType {
+  id: number
+  leaveTypeName: string
+}
+
+interface Application {
+  id: number
+  leaveTypeName: string
+  fromDate: string
+  toDate: string
+  totalDays: number
+  isHalfDay: boolean
+  session: string | null
+  workHours: string
+  reason: string
+  approvalStatus: string
+  createdOn: string
+}
+
+export function MyApplicationsPage() {
+
+  const [leaveBalances, setLeaveBalances] = useState<LeaveBalance[]>([])
+
+  const [applications, setApplications] = useState<Application[]>([])
+
+  const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([])
+
+  const [search, setSearch] = useState('')
+
+  const [modalOpen, setModalOpen] = useState(false)
+
+  const [loading, setLoading] = useState(false)
+
+  const [error, setError] = useState('')
+
+  const [form, setForm] = useState({
+    leaveTypeId: '',
+    fromDate: '',
+    toDate: '',
+    isHalfDay: false,
+    session: '',
+    workHours: '',
+    reason: '',
+  })
+
+  useEffect(() => {
+    fetchLeaveBalances()
+    fetchApplications()
+    fetchLeaveTypes()
+  }, [])
+
+  async function fetchLeaveBalances() {
+
+    try {
+
+      const response = await api.get(
+        '/user-leaves/balances'
+      )
+
+      setLeaveBalances(response.data)
+
+    } catch (error) {
+
+      console.error(
+        'Error fetching leave balances',
+        error
+      )
+    }
+  }
+
+  async function fetchApplications() {
+
+    try {
+
+      const response = await api.get(
+        '/user-leaves/applications'
+      )
+
+      setApplications(response.data)
+
+    } catch (error) {
+
+      console.error(
+        'Error fetching applications',
+        error
+      )
+    }
+  }
+
+  async function fetchLeaveTypes() {
+
+    try {
+
+      const response = await api.get(
+        '/user-leaves/leave-types'
+      )
+
+      setLeaveTypes(response.data)
+
+    } catch (error) {
+
+      console.error(
+        'Error fetching leave types',
+        error
+      )
+    }
+  }
+
+  function openModal() {
+
+    setForm({
+      leaveTypeId: '',
+      fromDate: '',
+      toDate: '',
+      isHalfDay: false,
+      session: '',
+      workHours: '',
+      reason: '',
+    })
+
+    setError('')
+
+    setModalOpen(true)
+  }
+
+  function closeModal() {
+    setModalOpen(false)
+  }
+
+  const filteredApplications = useMemo(() => {
+
+    const q = search.toLowerCase()
+
+    return applications.filter(
+      (app) =>
+        app.leaveTypeName
+          .toLowerCase()
+          .includes(q) ||
+
+        app.approvalStatus
+          .toLowerCase()
+          .includes(q)
+    )
+
+  }, [applications, search])
+
+  async function handleSubmit(
+    event: FormEvent<HTMLFormElement>
+  ) {
+
+    event.preventDefault()
+
+    if (
+      !form.leaveTypeId ||
+      !form.fromDate ||
+      !form.reason.trim()
+    ) {
+      setError('All required fields must be filled.')
+      return
+    }
+
+    if (
+      form.isHalfDay &&
+      !form.session
+    ) {
+      setError(
+        'Please select session for half day leave.'
+      )
+
+      return
+    }
+
+    try {
+
+      setLoading(true)
+
+      const payload = {
+
+        leaveTypeId: Number(form.leaveTypeId),
+
+        fromDate: form.fromDate,
+
+        toDate: form.isHalfDay
+          ? form.fromDate
+          : form.toDate,
+
+        isHalfDay: form.isHalfDay,
+
+        session: form.isHalfDay
+          ? form.session
+          : null,
+
+        workHours: form.workHours,
+
+        reason: form.reason,
+      }
+
+      await api.post(
+        '/user-leaves/applications',
+        payload
+      )
+
+      await fetchApplications()
+
+      await fetchLeaveBalances()
+
+      closeModal()
+
+    } catch (error: unknown) {
+
+      const axiosError = error as AxiosError<{ message?: string }>
+
+     console.error(axiosError)
+
+    setError(
+    axiosError.response?.data?.message ||
+    'Failed to apply leave'
+    )
+
+
+    } finally {
+
+      setLoading(false)
+    }
+  }
+
+  return (
+
+    <Layout title="My Applications">
+
+      <div className="act-page">
+
+        {/* HEADER */}
+        <div className="act-page-header">
+
+          <div>
+
+            <nav className="act-breadcrumb">
+
+              <span className="act-breadcrumb-link">
+                Applications
+              </span>
+
+            </nav>
+
+            <h1 className="act-title">
+              My Applications
+            </h1>
+
+          </div>
+
+          <button
+            className="act-new-btn"
+            onClick={openModal}
+          >
+            + New Application
+          </button>
+
+        </div>
+
+        {/* LEAVE BALANCE */}
+        <div className="act-stats">
+
+          {leaveBalances.map((leave) => (
+
+            <div
+              key={leave.leaveTypeId}
+              className="act-card"
+            >
+
+              <h3>
+                {leave.leaveTypeName}
+              </h3>
+
+              <p>
+                {leave.availableBalance}
+              </p>
+
+            </div>
+
+          ))}
+
+        </div>
+
+        {/* SEARCH */}
+        <div className="act-toolbar">
+
+          <input
+            className="act-search"
+            type="text"
+            placeholder="Search applications"
+            value={search}
+            onChange={(e) =>
+              setSearch(e.target.value)
+            }
+          />
+
+        </div>
+
+        {/* APPLICATION TABLE */}
+        <div className="act-table-wrapper">
+
+          <table className="act-table">
+
+            <thead>
+
+              <tr>
+
+                <th>ID</th>
+
+                <th>Leave Type</th>
+
+                <th>From</th>
+
+                <th>To</th>
+
+                <th>Total Days</th>
+
+                <th>Session</th>
+
+                <th>Status</th>
+
+              </tr>
+
+            </thead>
+
+            <tbody>
+
+              {filteredApplications.length === 0 ? (
+
+                <tr>
+
+                  <td
+                    colSpan={7}
+                    className="act-empty"
+                  >
+                    No applications found.
+                  </td>
+
+                </tr>
+
+              ) : (
+
+                filteredApplications.map((app) => (
+
+                  <tr key={app.id}>
+
+                    <td>{app.id}</td>
+
+                    <td>
+                      {app.leaveTypeName}
+                    </td>
+
+                    <td>
+                      {app.fromDate}
+                    </td>
+
+                    <td>
+                      {app.toDate}
+                    </td>
+
+                    <td>
+                      {app.totalDays}
+                    </td>
+
+                    <td>
+
+                      {app.isHalfDay
+                        ? app.session === 'FIRST_HALF'
+                          ? 'First Half'
+                          : 'Second Half'
+                        : '-'}
+
+                    </td>
+
+                    <td>
+
+                      <span
+                        className={`act-status ${app.approvalStatus.toLowerCase()}`}
+                      >
+
+                        {app.approvalStatus}
+
+                      </span>
+
+                    </td>
+
+                  </tr>
+
+                ))
+
+              )}
+
+            </tbody>
+
+          </table>
+
+        </div>
+
+        {/* MODAL */}
+        {modalOpen && (
+
+          <div
+            className="act-modal-overlay"
+            onClick={closeModal}
+          >
+
+            <div
+              className="act-modal"
+              onClick={(e) =>
+                e.stopPropagation()
+              }
+            >
+
+              {/* HEADER */}
+              <div className="act-modal-header">
+
+                <h2>
+                  Apply Leave
+                </h2>
+
+                <button
+                  className="act-modal-close"
+                  onClick={closeModal}
+                >
+                  &times;
+                </button>
+
+              </div>
+
+              {/* FORM */}
+              <form
+                className="act-modal-form"
+                onSubmit={handleSubmit}
+              >
+
+                {/* ROW 1 */}
+                <div className="act-form-row">
+
+                  {/* LEAVE TYPE */}
+                  <label className="act-form-field">
+
+                    <span>
+                      Leave Type *
+                    </span>
+
+                    <select
+                      value={form.leaveTypeId}
+                      onChange={(e) =>
+                        setForm((c) => ({
+                          ...c,
+                          leaveTypeId: e.target.value,
+                        }))
+                      }
+                    >
+
+                      <option value="">
+                        Select Leave Type
+                      </option>
+
+                      {leaveTypes.map((leave) => (
+
+                        <option
+                          key={leave.id}
+                          value={leave.id}
+                        >
+
+                          {leave.leaveTypeName}
+
+                        </option>
+
+                      ))}
+
+                    </select>
+
+                  </label>
+
+                  {/* HALF DAY */}
+                  <label className="act-form-field">
+
+                    <span>
+                      Half Day *
+                    </span>
+
+                    <div className="halfday-radio-group">
+
+                      {/* TRUE */}
+                      <label className="halfday-radio">
+
+                        <input
+                          type="radio"
+                          name="halfDay"
+                          checked={form.isHalfDay === true}
+                          onChange={() =>
+                            setForm((c) => ({
+                              ...c,
+                              isHalfDay: true,
+                              toDate: c.fromDate,
+                            }))
+                          }
+                        />
+
+                        <span>True</span>
+
+                      </label>
+
+                      {/* FALSE */}
+                      <label className="halfday-radio">
+
+                        <input
+                          type="radio"
+                          name="halfDay"
+                          checked={form.isHalfDay === false}
+                          onChange={() =>
+                            setForm((c) => ({
+                              ...c,
+                              isHalfDay: false,
+                              session: '',
+                            }))
+                          }
+                        />
+
+                        <span>False</span>
+
+                      </label>
+
+                    </div>
+
+                  </label>
+
+                </div>
+
+                {/* ROW 2 */}
+                <div className="act-form-row">
+
+                  {/* FROM DATE */}
+                  <label className="act-form-field">
+
+                    <span>
+                      From Date *
+                    </span>
+
+                    <input
+                      type="date"
+                      value={form.fromDate}
+                      onChange={(e) =>
+                        setForm((c) => ({
+                          ...c,
+                          fromDate: e.target.value,
+
+                          toDate:
+                            c.isHalfDay
+                              ? e.target.value
+                              : c.toDate,
+                        }))
+                      }
+                    />
+
+                  </label>
+
+                  {/* TO DATE */}
+                  <label className="act-form-field">
+
+                    <span>
+                      To Date *
+                    </span>
+
+                    <input
+                      type="date"
+                      value={
+                        form.isHalfDay
+                          ? form.fromDate
+                          : form.toDate
+                      }
+                      disabled={form.isHalfDay}
+                      onChange={(e) =>
+                        setForm((c) => ({
+                          ...c,
+                          toDate: e.target.value,
+                        }))
+                      }
+                    />
+
+                  </label>
+
+                </div>
+
+                {/* SESSION */}
+                {form.isHalfDay && (
+
+                  <div className="act-form-row">
+
+                    <label className="act-form-field">
+
+                      <span>
+                        Session *
+                      </span>
+
+                      <select
+                        value={form.session}
+                        onChange={(e) =>
+                          setForm((c) => ({
+                            ...c,
+                            session: e.target.value,
+                          }))
+                        }
+                      >
+
+                        <option value="">
+                          Select Session
+                        </option>
+
+                        <option value="FIRST_HALF">
+                          First Half
+                        </option>
+
+                        <option value="SECOND_HALF">
+                          Second Half
+                        </option>
+
+                      </select>
+
+                    </label>
+
+                  </div>
+
+                )}
+
+                {/* WORK HOURS + REASON */}
+                <div className="act-form-row">
+
+                  {/* WORK HOURS */}
+                  <label className="act-form-field">
+
+                    <span>
+                      Work Hours
+                    </span>
+
+                    <input
+                      type="number"
+                      min="0"
+                      max="24"
+                      value={form.workHours}
+                      onChange={(e) =>
+                        setForm((c) => ({
+                          ...c,
+                          workHours: e.target.value,
+                        }))
+                      }
+                      placeholder="Enter work hours"
+                    />
+
+                  </label>
+
+                  {/* REASON */}
+                  <label className="act-form-field">
+
+                    <span>
+                      Reason *
+                    </span>
+
+                    <textarea
+                      rows={3}
+                      value={form.reason}
+                      onChange={(e) =>
+                        setForm((c) => ({
+                          ...c,
+                          reason: e.target.value,
+                        }))
+                      }
+                      placeholder="Enter leave reason"
+                    />
+
+                  </label>
+
+                </div>
+
+                {/* ERROR */}
+                {error && (
+
+                  <div className="form-error">
+                    {error}
+                  </div>
+
+                )}
+
+                {/* ACTIONS */}
+                <div className="act-modal-actions">
+
+                  <button
+                    type="button"
+                    className="act-cancel-btn"
+                    onClick={closeModal}
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="submit"
+                    className="act-submit-btn"
+                    disabled={loading}
+                  >
+
+                    {loading
+                      ? 'Applying...'
+                      : 'Apply Leave'}
+
+                  </button>
+
+                </div>
+
+              </form>
+
+            </div>
+
+          </div>
+
+        )}
+
+      </div>
+
+    </Layout>
+  )
+}

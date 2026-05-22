@@ -20,6 +20,8 @@ public interface IUserLeaveManager
         CancellationToken cancellationToken = default);
 
         Task<IEnumerable<UserLeaveBalanceDTO>> GetUserLeaveBalances (int userId,int companyId,CancellationToken cancellationToken);
+
+        Task<IEnumerable<LeaveTypeDropdownDto>>GetLeaveTypesAsync(int companyId,CancellationToken cancellationToken = default);
 }
 
 

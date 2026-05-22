@@ -105,10 +105,25 @@ body {
 
 .input-group input,
 .act-search,
-.act-form-field input,
 .act-form-field textarea,
 .act-form-field select {
   width: 100%;
+
+  padding: 14px;
+
+  border: 1px solid #ccc;
+
+  border-radius: 10px;
+
+  font-size: 15px;
+
+  outline: none;
+
+  transition: 0.3s;
+}
+
+.act-form-field input{
+  width: auto;
 
   padding: 14px;
 
@@ -300,36 +315,7 @@ body {
   z-index: 1000;
 }
 
-{/*.act-modal-overlay {
-  position: fixed;
 
-  inset: 0;
-
-  background: rgba(0, 0, 0, 0.5);
-
-  display: flex;
-
-  justify-content: center;
-
-  align-items: flex-start;
-
-  padding-top: 40px;
-
-  overflow-y: auto;
-
-  z-index: 1000;
-}*/}
-
-{/*.act-modal {
-  background: white;
-
-  width: 90%;
-  max-width: 700px;
-
-  border-radius: 16px;
-
-  padding: 30px;
-}*/}
 
 .act-modal {
   background: white;
@@ -384,7 +370,7 @@ body {
 }
 
 .act-form-field span {
-  margin-bottom: 8px;
+  margin-bottom: 3px;
 
   font-weight: 600;
 }
@@ -1017,4 +1003,197 @@ body {
   .check-btn {
     flex: 1;
   }
+}
+
+
+/*my applications*/ 
+
+.act-page {
+  padding: 20px;
+}
+
+/* HEADER */
+.myapp-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+   width: 100%;
+  margin-bottom: 20px;
+}
+
+.act-title {
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.act-new-btn {
+  background: #4f46e5;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* STATS */
+.act-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 15px;
+  margin-bottom: 25px;
+}
+
+.act-card {
+  background: white;
+  padding: 18px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.act-card h3 {
+  font-size: 14px;
+  color: #666;
+}
+
+.act-card p {
+  font-size: 22px;
+  font-weight: bold;
+  margin-top: 8px;
+}
+
+/* SECTION */
+.act-section {
+  margin-top: 25px;
+}
+
+.act-section h3 {
+  margin-bottom: 10px;
+}
+
+/* BOX */
+.act-box {
+  background: #f9fafb;
+  padding: 15px;
+  border-radius: 10px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.act-secondary-btn {
+  background: transparent;
+  border: 1px solid #4f46e5;
+  color: #4f46e5;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* LIST */
+.act-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.act-list-item {
+  background: white;
+  padding: 12px 15px;
+  border-radius: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+}
+
+.act-date {
+  font-size: 12px;
+  color: gray;
+}
+
+/* STATUS */
+.act-status {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+}
+
+.act-status.pending {
+  background: #fff4d6;
+  color: #b7791f;
+}
+
+.act-status.approved {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.act-status.rejected {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.halfday-radio-group {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-top: 8px;
+}
+
+.halfday-radio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.halfday-radio input[type='radio'] {
+  cursor: pointer;
+}
+
+.menu-group {
+  margin-bottom: 8px;
+}
+
+.menu-parent {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 66px;
+  cursor: pointer;
+  border-radius: 10px;
+  font-weight: 500;
+  color:#334155;
+  background: white;
+}
+
+.menu-parent:hover {
+  background: #eff6ff;
+}
+
+.submenu {
+  margin-top: 6px;
+  margin-left: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.submenu-item {
+  padding: 10px 14px;
+  border-radius: 8px;
+  text-decoration: none;
+  color: #334155;
+  font-size: 14px;
+  transition: 0.2s;
+}
+
+.submenu-item:hover {
+  background: rgba(255,255,255,0.1);
+}
+
+.submenu-item.active {
+  background: #34d399;
+  color: white;
 }

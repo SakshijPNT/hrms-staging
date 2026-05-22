@@ -2,6 +2,19 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import '../styles/Style.css'
 import api from '../services/api'
 import Layout from '../pages/Layout'
+import type { AxiosError } from 'axios'
+
+interface ApiUser {
+  id: number
+  fullName: string
+  emailId: string
+  roleId: number
+  managerId: number | null
+  joiningDate: string
+  probationMonths: number
+  confirmationDate: string | null
+  statusCode: number
+}
 
 interface UserItem {
   id: number
@@ -10,9 +23,10 @@ interface UserItem {
   roleId: number
   roleName: string
   managerId: number | null
+  managerName: string
   joiningDate: string
   probationMonths: number
-  confirmationDate: string
+  confirmationDate: string | null
   status: boolean
 }
 
@@ -28,103 +42,109 @@ interface ManagerItem {
 
 export function UsersPage() {
 
-  const [users, setUsers] = useState<UserItem[]>([])
-  const [roles, setRoles] = useState<RoleItem[]>([])
-  const [managers, setManagers] = useState<ManagerItem[]>([])
+            const [users, setUsers] = useState<UserItem[]>([])
+            const [roles, setRoles] = useState<RoleItem[]>([])
+            const [managers, setManagers] = useState<ManagerItem[]>([])
 
-  const [search, setSearch] = useState('')
+            const [search, setSearch] = useState('')
 
-  const [modalOpen, setModalOpen] = useState(false)
+            const [modalOpen, setModalOpen] = useState(false)
 
-  const [editingUserId, setEditingUserId] =
-    useState<number | null>(null)
+            const [editingUserId, setEditingUserId] =
+              useState<number | null>(null)
 
-  const [editingStatusCode, setEditingStatusCode] =
-    useState<number>(1)
+            const [editingStatusCode, setEditingStatusCode] =
+              useState<number>(1)
 
-  const [currentPage, setCurrentPage] = useState(1)
+            const [currentPage, setCurrentPage] = useState(1)
 
-  const [error, setError] = useState('')
+            const [error, setError] = useState('')
 
-  const [form, setForm] = useState({
-    fullName: '',
-    emailId: '',
-    password: '',
-    managerId: '',
-    companyId: 1,
-    roleId: '',
-    joiningDate: '',
-    probationMonths: 0,
-    confirmationDate: '',
-  })
+            const [form, setForm] = useState({
+              fullName: '',
+              emailId: '',
+              managerId: '',
+              companyId: 1,
+              roleId: '',
+              joiningDate: '',
+              probationMonths: 0,
+              confirmationDate: '',
+            })
 
-  async function fetchUsers(roleData: RoleItem[]) { {
-    try {
+  
+              async function fetchUsers(roleData: RoleItem[], userData: ApiUser[]) {
+                try {
 
-      const res = await api.get('/Users/company')
-      console.log(res.data)
+                  // Build manager lookup map ONCE
+                  const managerMap = new Map(
+                    userData.map((u) => [u.id, u.fullName])
+                  )
 
-      const mappedUsers = res.data.map((user: any) => {
+                  // Map users for UI
+                  const mappedUsers = userData.map((user) => {
 
-        const role = roleData.find(
-  (r: any) => Number(r.id) === Number(user.roleId)
-)
+                    const role = roleData.find(
+                      (r) => Number(r.id) === Number(user.roleId)
+                    )
 
-        return {
-          id: user.id,
-          fullName: user.fullName,
-          emailId: user.emailId,
-          roleId: user.roleId,
-          roleName: role?.roleName || '',
-          managerId: user.managerId,
-          joiningDate: user.joiningDate,
-          probationMonths: user.probationMonths,
-          confirmationDate: user.confirmationDate,
-          status: user.statusCode === 1,
-        }
-      })
+                    return {
+                      id: user.id,
+                      fullName: user.fullName,
+                      emailId: user.emailId,
+                      roleId: user.roleId,
+                      roleName: role?.roleName || '',
+                      managerId: user.managerId,
+                      managerName: managerMap.get(user.managerId ?? 0) || '',
+                      joiningDate: user.joiningDate,
+                      probationMonths: user.probationMonths,
+                      confirmationDate: user.confirmationDate,
+                      status: user.statusCode === 1,
+                    }
+                  })
+                    setUsers(mappedUsers)
 
-      setUsers(mappedUsers)
-
-    } catch (err) {
-      console.error('Failed to fetch users', err)
-    }
-  }
-}
+                } catch (err) {
+                  console.error(
+                    'Failed to fetch users',
+                    err
+                  )
+                }
+              }
+ 
 
   useEffect(() => {
 
-    async function loadData() {
+                  async function loadData() {
 
-      try {
+                    try {
 
-        // ROLES
-        const rolesRes = await api.get('/Roles/company')
+                      // ROLES
+                      const rolesRes = await api.get('/Roles/company')
 
-        const roleList = rolesRes.data.map((r: any) => ({
-          id: r.id,
-          roleName: r.roleName,
-        }))
+                      const roleList = rolesRes.data.map((r: RoleItem) => ({
+                        id: r.id,
+                        roleName: r.roleName,
+                      }))
 
-        setRoles(roleList)
+                      setRoles(roleList)
 
-        // USERS
-        await fetchUsers(roleList)
+                      // USERS
+                      const usersRes = await api.get('/Users/company')
 
-        // Managers dropdown
-        const usersRes = await api.get('/Users/company')
+                      await fetchUsers(roleList, usersRes.data)
 
-        setManagers(
-          usersRes.data.map((u: any) => ({
-            id: u.id,
-            fullName: u.fullName,
-          }))
-        )
 
-      } catch (err) {
-        console.error(err)
-      }
-    }
+                      setManagers(
+                        usersRes.data.map((u: ApiUser) => ({
+                          id: u.id,
+                          fullName: u.fullName,
+                        }))
+                      )
+
+                    } catch (err) {
+                      console.error(err)
+                    }
+                  }
 
     loadData()
 
@@ -151,7 +171,6 @@ export function UsersPage() {
     setForm({
       fullName: '',
       emailId: '',
-      password: '',
       managerId: '',
       companyId: 1,
       roleId: '',
@@ -183,7 +202,6 @@ export function UsersPage() {
     setForm({
       fullName: user.fullName,
       emailId: user.emailId,
-      password: '',
       managerId: user.managerId
         ? String(user.managerId)
         : '',
@@ -223,7 +241,17 @@ export function UsersPage() {
       }
     )
 
-    await fetchUsers(roles)
+    setUsers((prevUsers) =>
+      prevUsers.map((user) =>
+        user.id === userId
+          ? {
+              ...user,
+              status: !currentStatus,
+            }
+          : user
+      )
+    )
+
 
   } catch (error) {
 
@@ -259,16 +287,12 @@ export function UsersPage() {
       const payload = {
         fullName: form.fullName,
         emailId: form.emailId,
-        password: form.password,
-        managerId: form.managerId
-          ? Number(form.managerId)
-          : null,
+        managerId: form.managerId? Number(form.managerId): null,
         companyId: form.companyId,
         roleId: Number(form.roleId),
         joiningDate: form.joiningDate,
         probationMonths: Number(form.probationMonths),
-        confirmationDate:
-          form.confirmationDate || null,
+        confirmationDate:form.confirmationDate || null,
         statusCode: editingStatusCode,
         createdBy: 1,
         updatedBy: 1,
@@ -288,19 +312,31 @@ export function UsersPage() {
         await api.post('/Users', payload)
       }
 
-      await fetchUsers(roles)
+     const usersRes = await api.get('/Users/company')
 
-      closeModal()
+await fetchUsers(roles, usersRes.data)
 
-    } catch (error: any) {
+setManagers(
+  usersRes.data.map((u: ApiUser) => ({
+    id: u.id,
+    fullName: u.fullName,
+  }))
+)
 
-      console.error(error)
+closeModal()
 
-      setError(
-        error?.response?.data?.message ||
-        'Failed to save user'
-      )
-    }
+ } catch (error: unknown) {
+
+  const axiosError =
+    error as AxiosError<{ message?: string }>
+
+  console.error(axiosError)
+
+  setError(
+    axiosError.response?.data?.message ||
+    'Failed to save user'
+  )
+}
   }
 
   const usersPerPage = 5
@@ -375,6 +411,7 @@ export function UsersPage() {
               <th>Full Name</th>
               <th>Email</th>
               <th>Role</th>
+              <th>Manager</th>
               <th>Joining Date</th>
               <th>Status</th>
               <th>Edit</th>
@@ -404,6 +441,7 @@ export function UsersPage() {
                   <td>{user.emailId}</td>
 
                   <td>{user.roleName}</td>
+                  <td>{user.managerName}</td>
 
                   <td>{user.joiningDate}</td>
 
@@ -423,16 +461,21 @@ export function UsersPage() {
     </span>
 
     <label className="role-switch">
-      <input
-        type="checkbox"
-        checked={user.status}
-        onChange={() =>
-          toggleUserStatus(
-            user.id,
-            user.status
-          )
-        }
-      />
+   <input
+  type="checkbox"
+  aria-label={
+    user.status
+      ? 'Deactivate user'
+      : 'Activate user'
+  }
+  checked={user.status}
+  onChange={() =>
+    toggleUserStatus(
+      user.id,
+      user.status
+    )
+  }
+/>
 
       <span className="role-slider" />
     </label>
@@ -574,21 +617,6 @@ export function UsersPage() {
               <div className="act-form-row">
 
                 <label className="act-form-field">
-                  <span>Password *</span>
-
-                  <input
-                    type="password"
-                    value={form.password}
-                    onChange={(e) =>
-                      setForm((c) => ({
-                        ...c,
-                        password: e.target.value,
-                      }))
-                    }
-                  />
-                </label>
-
-                <label className="act-form-field">
                   <span>Role *</span>
 
                   <select
@@ -599,7 +627,7 @@ export function UsersPage() {
                         roleId: e.target.value,
                       }))
                     }
-                  >
+                   >
                     <option value="">
                       Select Role
                     </option>
@@ -614,10 +642,6 @@ export function UsersPage() {
                     ))}
                   </select>
                 </label>
-
-              </div>
-
-              <div className="act-form-row">
 
                 <label className="act-form-field">
                   <span>Manager</span>
@@ -646,6 +670,12 @@ export function UsersPage() {
                   </select>
                 </label>
 
+
+              </div>
+
+              <div className="act-form-row">
+
+                
                 <label className="act-form-field">
                   <span>Joining Date *</span>
 
@@ -660,10 +690,6 @@ export function UsersPage() {
                     }
                   />
                 </label>
-
-              </div>
-
-              <div className="act-form-row">
 
                 <label className="act-form-field">
                   <span>Probation Months</span>
@@ -681,6 +707,12 @@ export function UsersPage() {
                   />
                 </label>
 
+
+              </div>
+
+              <div className="act-form-row">
+
+                
                 <label className="act-form-field">
                   <span>Confirmation Date</span>
 

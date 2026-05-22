@@ -9,12 +9,15 @@ public class SessionInfoDto
     public string CompanyName { get; set; } = null!;
     public int RoleId { get; set; }
     public string RoleName { get; set; } = null!;
+
+    public string Timezone { get; set; } = "Asia/Kolkata"; //default
 }
 
 public class LoginResponseDto
 {
-    public List<ModuleDto> Modules { get; set; } = [];
-    public List<ActivityDto> Activities { get; set; } = [];
+    public List<ModuleGroupDto> Groups { get; set; } = new();
+
+    public List<ActivityDto> Activities { get; set; } = new();
 }
 
 public class ModuleDto

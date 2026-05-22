@@ -56,16 +56,59 @@ public class AuthManager : IAuthManager
 
         var activityIds = activities.Select(a => a.Id).ToHashSet();
 
-        var modules = await _db.ModuleMasters.AsNoTracking()
-            .Where(mm => mm.StatusCode == 1)
-            .Select(mm => new ModuleDto
+       var modules = await _db.ModuleMasters
+    .AsNoTracking()
+    .Where(mm => mm.StatusCode == 1)
+    .ToListAsync(cancellationToken);
+
+var groupedModules = modules
+    .Where(parent => parent.ParentModuleId == null)
+    .Select(parent => new ModuleGroupDto
+    {
+        GroupId = parent.Id,
+
+        GroupName = parent.ModuleName,
+
+        Modules = modules
+            .Where(child => child.ParentModuleId == parent.Id)
+            .Select(child => new ModuleItemDto
             {
-                Id = mm.Id,
-                ModuleName = mm.ModuleName,
-                Description = mm.Description,
-                IconUrl = mm.IconUrl,
+                Id = child.Id,
+                ModuleName = child.ModuleName,
+                Description = child.Description,
+                IconUrl = child.IconUrl,
+            })
+            .ToList()
+    })
+    .Where(g => g.Modules.Any())
+    .ToList();
+
+
+// ADD standalone modules also
+var standaloneModules = modules
+    .Where(x =>
+        x.ParentModuleId == null &&
+        !modules.Any(c => c.ParentModuleId == x.Id))
+    .Select(x => new ModuleGroupDto
+    {
+        GroupId = x.Id,
+
+        GroupName = x.ModuleName,
+
+        Modules = new List<ModuleItemDto>
+        {
+            new ModuleItemDto
+            {
+                Id = x.Id,
+                ModuleName = x.ModuleName,
+                Description = x.Description,
+                IconUrl = x.IconUrl,
             }
-        ).ToListAsync(cancellationToken);
+        }
+    })
+    .ToList();
+
+groupedModules.AddRange(standaloneModules);
 
         var session = new SessionInfoDto
         {
@@ -80,7 +123,7 @@ public class AuthManager : IAuthManager
 
         var response = new LoginResponseDto
         {
-            Modules = modules,
+            Groups = groupedModules,
             Activities = activities,
         };
 

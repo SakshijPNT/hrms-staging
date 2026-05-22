@@ -70,4 +70,41 @@ public class CompanyController : ControllerBase
         var rawSession = HttpContext.Session.GetString(SessionKey);
         return rawSession is null ? null : JsonSerializer.Deserialize<SessionInfoDto>(rawSession);
     }
+
+
+   [HttpDelete("{companyId}")]
+public async Task<IActionResult> DeleteCompany(int companyId,CancellationToken cancellationToken)
+            {
+                try
+                {
+                    // Example:
+                    // Get logged-in user id from session/token
+                    int deletedBy = 1;
+
+                    var result = await _companyManager.DeleteCompanyAsync(
+                        companyId,
+                        deletedBy,
+                        cancellationToken);
+
+                    return Ok(new
+                    {
+                        message = "Company deleted successfully.",
+                        success = result
+                    });
+                }
+                catch (KeyNotFoundException ex)
+                {
+                    return NotFound(new
+                    {
+                        message = ex.Message
+                    });
+                }
+                catch (Exception ex)
+                {
+                    return BadRequest(new
+                    {
+                        message = ex.Message
+                    });
+                }
+            }
 }

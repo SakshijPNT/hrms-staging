@@ -13,9 +13,7 @@ public class UserUpsertDto
     [MaxLength(150)]
     public string EmailId { get; set; } = null!;
 
-    [Required]
-    [MaxLength(255)]
-    public string Password { get; set; } = null!;
+   
 
     public int? ManagerId { get; set; }
 

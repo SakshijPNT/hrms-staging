@@ -158,7 +158,7 @@ public class UserLeaveManager : IUserLeaveManager
         }
     }
 
-    private async Task ValidateWorkingDaysAsync(int companyId,IReadOnlyList<DateOnly> requestedDates,CancellationToken cancellationToken)
+    private async Task ValidateWorkingDaysAsync(int  companyId,IReadOnlyList<DateOnly> requestedDates,CancellationToken cancellationToken)
     {
         var workDaysText = await _dbContext.CompanyPolicies
             .AsNoTracking()
@@ -194,7 +194,7 @@ public class UserLeaveManager : IUserLeaveManager
 
     public async Task<IEnumerable<UserLeaveBalanceDTO>> GetUserLeaveBalances (int userId,int companyId,CancellationToken cancellationToken)
     {
-        return await (
+        return await (  
             from balance in _dbContext.UserLeaveBalances.AsNoTracking()
             where balance.UserId == userId && balance.StatusCode == 1
             join leaveType in _dbContext.LeaveTypeMasters.AsNoTracking()
@@ -311,4 +311,18 @@ public class UserLeaveManager : IUserLeaveManager
             CreatedOn = leaveApplication.CreatedOn,
         };
     }
+
+    public async Task<IEnumerable<LeaveTypeDropdownDto>>GetLeaveTypesAsync(int companyId,CancellationToken cancellationToken = default)
+{
+        return await _dbContext.LeaveTypeMasters.AsNoTracking()
+        .Where(x =>
+            x.CompanyId == companyId &&
+            x.StatusCode == 1)
+        .Select(x => new LeaveTypeDropdownDto
+        {
+            Id = x.Id,
+            LeaveTypeName = x.LeaveTypeName
+        })
+        .ToListAsync(cancellationToken);
+}
 }

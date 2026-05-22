@@ -113,4 +113,23 @@ public class UserLeavesController : ControllerBase
         var rawSession = HttpContext.Session.GetString(SessionKey);
         return rawSession is null ? null : JsonSerializer.Deserialize<SessionInfoDto>(rawSession);
     }
+    
+
+    [HttpGet("leave-types")]
+    public async Task<IActionResult> GetLeaveTypes(CancellationToken cancellationToken)
+    {
+    var session = GetSessionInfo();
+    if (session is null)
+    {
+        return Unauthorized(
+            new { message = "No active session." });
+    }
+
+    var leaveTypes =
+        await _userLeaveManager.GetLeaveTypesAsync(
+            session.CompanyId,
+            cancellationToken);
+
+    return Ok(leaveTypes);
+}
 }

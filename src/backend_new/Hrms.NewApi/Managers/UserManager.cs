@@ -11,7 +11,7 @@ public class UserManager : IUserManager
 {
     private readonly HrmsDbContext _dbContext;
     private readonly IPasswordHasher<UserMaster> _passwordHasher;
-
+    private const string DefaultPassword = "Welcome@123";
     public UserManager(HrmsDbContext dbContext, IPasswordHasher<UserMaster> passwordHasher)
     {
         _dbContext = dbContext;
@@ -39,7 +39,7 @@ public class UserManager : IUserManager
             UpdatedOn = DateTimeOffset.UtcNow,
         };
 
-        user.Password = _passwordHasher.HashPassword(user, request.Password);
+        user.Password = _passwordHasher.HashPassword(user, "Welcome@123");
 
         _dbContext.UserMasters.Add(user);
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -65,7 +65,7 @@ public class UserManager : IUserManager
         user.StatusCode = request.StatusCode;
         user.UpdatedBy = request.UpdatedBy;
         user.UpdatedOn = DateTimeOffset.UtcNow;
-        user.Password = _passwordHasher.HashPassword(user, request.Password);
+        
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
@@ -88,18 +88,25 @@ public class UserManager : IUserManager
     {
         return await (
             from user in _dbContext.UserMasters.AsNoTracking()
-            where user.CompanyId == companyId && user.StatusCode == 1
+            where user.CompanyId == companyId
             join reportingManager in _dbContext.UserMasters.AsNoTracking()
                 on user.ManagerId equals reportingManager.Id into reportingManagers
             from reportingManager in reportingManagers.DefaultIfEmpty()
             orderby user.FullName
             select new CompanyUserListItemDto
             {
-                FullName = user.FullName,
-                EmailId = user.EmailId,
-                ReportingManagerEmailId = reportingManager == null ? null : reportingManager.EmailId,
-                JoiningDate = user.JoiningDate,
-            })
+            Id = user.Id,
+            FullName = user.FullName,
+            EmailId = user.EmailId,
+            RoleId = user.RoleId,
+            ManagerId = user.ManagerId,
+            ReportingManagerEmailId =
+            reportingManager == null ? null : reportingManager.EmailId,
+            JoiningDate = user.JoiningDate,
+            ProbationMonths = user.ProbationMonths,
+            ConfirmationDate = user.ConfirmationDate,
+            StatusCode = user.StatusCode
+})
             .ToListAsync(cancellationToken);
     }
 

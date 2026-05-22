@@ -9,6 +9,8 @@ import Login from './pages/login'
 import Dashboard from './pages/Dashboard'
 import { RolesPage } from './pages/Roles'
 import { UsersPage } from './pages/Users'
+import { MyApplicationsPage } from './pages/MyApplications'
+
 
 function App() {
   return (
@@ -46,6 +48,13 @@ function App() {
           path="/users"
           element={<UsersPage />}
         />
+
+        <Route
+        path="/my-applications"
+        element={<MyApplicationsPage />}
+        />
+
+      
 
       </Routes>
     </BrowserRouter>

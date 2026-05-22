@@ -1,100 +1,168 @@
 import { useEffect, useState } from 'react'
 import Layout from './Layout'
 import '../styles/Style.css'
+import api from '../services/api'
+import type { AxiosError } from 'axios'
 
 export default function Dashboard() {
 
-  const [checkedIn, setCheckedIn] = useState(false)
-  const [checkedOut, setCheckedOut] = useState(false)
+  interface Attendance {
+  checkInTime: string | null
+  checkOutTime: string | null
+  workedHours: number
+  attendanceStatus: string
+}
+
+  const [attendance, setAttendance] = useState<Attendance | null>(null)
 
   const [currentTime, setCurrentTime] =
     useState(new Date())
 
-  const [checkInTime, setCheckInTime] =
-    useState('')
+  const [loading, setLoading] =
+    useState(false)
+ 
+    const session = JSON.parse(
+  localStorage.getItem('session') || '{}'
+)
 
-  const [checkOutTime, setCheckOutTime] =
-    useState('')
+const timezone =session.timezone || 'Asia/Kolkata'
 
-  const [workingHours, setWorkingHours] =
-    useState('')
+  // =========================================
+  // FETCH TODAY ATTENDANCE
+  // =========================================
 
-  useEffect(() => {
+  /*const fetchTodayAttendance = async () => {
 
-    const timer = setInterval(() => {
-      setCurrentTime(new Date())
-    }, 1000)
+    try {
 
-    return () => clearInterval(timer)
+      const response =
+        await api.get('/attendance/today')
 
-  }, [])
+      setAttendance(response.data)
 
-  const handleCheckIn = () => {
+    } catch {
 
-    const now = new Date()
-
-    setCheckedIn(true)
-    setCheckedOut(false)
-
-    setCheckInTime(
-      now.toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true,
-      })
-    )
-  }
-
-  const handleCheckOut = () => {
-
-    if (checkedIn) {
-
-      const now = new Date()
-
-      setCheckedOut(true)
-
-      setCheckOutTime(
-        now.toLocaleTimeString('en-US', {
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: true,
-        })
+      console.log(
+        'No attendance found for today'
       )
 
-      const checkInDate = new Date()
-
-      const [time, modifier] =
-        checkInTime.split(' ')
-
-      const [hours, minutes] =
-        time.split(':')
-
-      let hour = parseInt(hours)
-
-      if (modifier === 'PM' && hour !== 12) {
-        hour += 12
-      }
-
-      if (modifier === 'AM' && hour === 12) {
-        hour = 0
-      }
-
-      checkInDate.setHours(hour)
-      checkInDate.setMinutes(parseInt(minutes))
-      checkInDate.setSeconds(0)
-
-      const diffMs =
-        now.getTime() - checkInDate.getTime()
-
-      const totalMinutes =
-        Math.floor(diffMs / (1000 * 60))
-
-      const hrs = Math.floor(totalMinutes / 60)
-
-      const mins = totalMinutes % 60
-
-      setWorkingHours(`${hrs}h ${mins}m`)
+      setAttendance(null)
     }
+  }*/
+
+  // =========================================
+  // PAGE LOAD
+  // =========================================
+
+useEffect(() => {
+
+   const loadAttendance = async () => {
+
+    try {
+
+    const response =
+    await api.get('/attendance/today')
+
+    setAttendance(response.data)
+    } catch {
+      console.log(
+        'No attendance found for today'
+      )
+      setAttendance(null)
+    }
+  }
+
+  loadAttendance()
+
+  const timer = setInterval(() => {setCurrentTime(new Date())}, 1000)
+
+  return () => clearInterval(timer)
+
+}, [])
+
+  // =========================================
+  // CHECK IN
+  // =========================================
+
+  const handleCheckIn = async () => {
+
+    try {
+
+      setLoading(true)
+
+      const response =
+        await api.post('/attendance/check-in')
+
+      setAttendance(response.data)
+
+      alert('Checked in successfully')
+
+    } catch (error: unknown) {
+
+       const axiosError =
+      error as AxiosError<{ message?: string }>
+
+    alert(
+      axiosError.response?.data?.message ||
+      'Check-in failed'
+    )
+
+    } finally {
+
+      setLoading(false)
+    }
+  }
+
+  // =========================================
+  // CHECK OUT
+  // =========================================
+
+  const handleCheckOut = async () => {
+
+    try {
+
+      setLoading(true)
+
+      const response =
+        await api.post('/attendance/check-out')
+
+      setAttendance(response.data)
+
+      alert('Checked out successfully')
+
+    } catch (error: unknown) {
+
+       const axiosError =
+      error as AxiosError<{ message?: string }>
+
+      alert(
+        axiosError.response?.data?.message ||
+      'Check-out failed'
+      )
+
+    } finally {
+
+      setLoading(false)
+    }
+  }
+
+  // =========================================
+  // FORMAT TIME
+  // =========================================
+
+  const formatTime = (time: string | null | undefined) => {
+
+    if (!time) return '--:--'
+
+    return new Date(time).toLocaleTimeString(
+      'en-US',
+      {
+      timeZone: timezone,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+      }
+    )
   }
 
   return (
@@ -103,6 +171,8 @@ export default function Dashboard() {
 
       <div className="attendance-card">
 
+        {/* LEFT SIDE */}
+
         <div className="attendance-left">
 
           <p className="attendance-date">
@@ -110,6 +180,7 @@ export default function Dashboard() {
             {currentTime.toLocaleDateString(
               'en-US',
               {
+                timeZone: timezone,
                 weekday: 'long',
                 day: 'numeric',
                 month: 'long',
@@ -120,65 +191,120 @@ export default function Dashboard() {
 
           <h1 className="attendance-time">
 
-            {currentTime.toLocaleTimeString()}
+            {currentTime.toLocaleTimeString(
+            'en-US',
+            {
+              timeZone: timezone,
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+              hour12: true,
+              }
+            )}
 
           </h1>
 
           <p className="attendance-location">
-            Asia/Kolkata
+            {timezone}
           </p>
 
         </div>
 
+        {/* CENTER */}
+
         <div className="attendance-center">
 
           <div className="attendance-info">
+
             <span>IN</span>
+
             <strong>
-              {checkInTime || '--:--'}
+              {formatTime(attendance?.checkInTime)}
             </strong>
+
           </div>
 
           <div className="attendance-info">
+
             <span>OUT</span>
+
             <strong>
-              {checkOutTime || '--:--'}
+              {formatTime(attendance?.checkOutTime)}
             </strong>
+
           </div>
 
           <div className="attendance-info">
+
             <span>HOURS</span>
+
             <strong>
-              {workingHours || '0h 0m'}
+
+              {
+                attendance
+                  ? `${attendance.workedHours}h`
+                  : '0h'
+              }
+
             </strong>
+
+          </div>
+
+          <div className="attendance-info">
+
+            <span>STATUS</span>
+
+            <strong>
+
+              {
+                attendance?.attendanceStatus ||
+                'NOT CHECKED IN'
+              }
+
+            </strong>
+
           </div>
 
         </div>
 
+        {/* RIGHT SIDE */}
+
         <div className="attendance-buttons">
+
+          {/* CHECK IN */}
 
           <button
             className={`check-btn check-in-btn ${
-              checkedIn ? 'active-btn' : ''
+              attendance?.checkInTime
+                ? 'active-btn'
+                : ''
             }`}
             onClick={handleCheckIn}
-            disabled={checkedIn}
+            disabled={
+              !!attendance?.checkInTime || loading
+            }
           >
-            {checkedIn
-              ? 'CHECKED IN'
-              : 'CHECK IN'}
+
+            {
+              attendance?.checkInTime
+                ? 'CHECKED IN'
+                : 'CHECK IN'
+            }
+
           </button>
 
+          {/* CHECK OUT */}
+
           <button
-            className={`check-btn check-out-btn ${
-              checkedOut ? 'active-btn' : ''
-            }`}
+            className="check-btn check-out-btn"
             onClick={handleCheckOut}
-            disabled={!checkedIn || checkedOut}
+            disabled={
+              !attendance?.checkInTime || loading
+            }
           >
-            {checkedOut
-              ? 'CHECKED OUT'
-              : 'CHECK OUT'}
+
+            CHECK OUT
+
           </button>
 
         </div>

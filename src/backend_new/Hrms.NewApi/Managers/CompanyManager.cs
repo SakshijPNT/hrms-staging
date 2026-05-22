@@ -32,7 +32,7 @@ public class CompanyManager : ICompanyManager
 
         var now = DateTimeOffset.UtcNow;
         var company = new CompanyMaster
-        {
+        {  
             CompanyName = request.CompanyName,
             CompanyCode = request.CompanyCode,
             CompanyPhone = request.CompanyPhone,
@@ -54,6 +54,8 @@ public class CompanyManager : ICompanyManager
 
         return MapCompanyResponse(company);
     }
+
+
 
     public async Task<IReadOnlyList<CompanyListItemDto>> GetCompaniesAsync(int loggedInUserCompanyId,int loggedInUserRoleId,CancellationToken cancellationToken = default)
     {
@@ -107,4 +109,26 @@ public class CompanyManager : ICompanyManager
             UpdatedOn = company.UpdatedOn,
         };
     }
+
+    public async Task<bool> DeleteCompanyAsync(int companyId,int deletedBy,CancellationToken cancellationToken = default)
+                {
+                    var company = await _dbContext.CompanyMasters.FirstOrDefaultAsync(
+                            x => x.Id == companyId,
+                            cancellationToken);
+
+                    if (company == null)
+                    {
+                        throw new KeyNotFoundException("Company not found.");
+                    }
+
+                    // Soft Delete
+                    company.StatusCode = 0;
+
+                    company.UpdatedBy = deletedBy;
+                    company.UpdatedOn = DateTimeOffset.UtcNow;
+
+                    await _dbContext.SaveChangesAsync(cancellationToken);
+
+                    return true;
+                }
 }

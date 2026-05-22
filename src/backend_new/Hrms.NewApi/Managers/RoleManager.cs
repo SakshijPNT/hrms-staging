@@ -72,30 +72,59 @@ public class RoleManager : IRoleManager
 
         //return MapRoleResponse(role);
     //}
+public async Task<RoleResponseDto> UpdateRoleAsync(int id,RoleUpsertDto request,int fallbackCompanyId,CancellationToken cancellationToken = default)
+{
+    var role = await _dbContext.RoleMasters.FirstOrDefaultAsync(
+        x => x.Id == id,cancellationToken)?? throw new KeyNotFoundException($"Role with id {id} does not exist.");
 
-    public async Task<RoleResponseDto> UpdateRoleAsync(
-        int id,
-        RoleUpsertDto request,
-        int fallbackCompanyId,
-        CancellationToken cancellationToken = default)
+    var companyId = request.CompanyId ?? fallbackCompanyId;
+
+    await ValidateRoleAsync(request, companyId, id, cancellationToken);
+
+    // 1. Update Role Master table
+    role.RoleName = request.RoleName;
+    role.CompanyId = companyId;
+    role.Description = request.Description;
+    role.StatusCode = request.StatusCode;
+    role.UpdatedBy = request.UpdatedBy;
+    role.UpdatedOn = DateTimeOffset.UtcNow;
+
+    // =========================================
+    // 2. REMOVE OLD ACTIVITY MAPPINGS (ADD HERE)
+    // =========================================
+    var existingMappings = _dbContext.ActivityRoleMappings.Where(x => x.RoleId == role.Id);
+
+    _dbContext.ActivityRoleMappings.RemoveRange(existingMappings);
+
+    // =========================================
+    // 3. ADD NEW ACTIVITY MAPPINGS (ADD HERE)
+    // =========================================
+    if (request.ActivityIds.Any())
     {
-        var role = await _dbContext.RoleMasters.FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
-            ?? throw new KeyNotFoundException($"Role with id {id} does not exist.");
+        var activitiesFromDb = await _dbContext.ActivityMasters
+            .Where(a => request.ActivityIds.Contains(a.Id))
+            .ToListAsync(cancellationToken);
 
-        var companyId = request.CompanyId ?? fallbackCompanyId;
-        await ValidateRoleAsync(request, companyId, id, cancellationToken);
-
-        role.RoleName = request.RoleName;
-        role.CompanyId = companyId;
-        role.Description = request.Description;
-        role.StatusCode = request.StatusCode;
-        role.UpdatedBy = request.UpdatedBy;
-        role.UpdatedOn = DateTimeOffset.UtcNow;
-
-        await _dbContext.SaveChangesAsync(cancellationToken);
-
-        return MapRoleResponse(role);
+        foreach (var activity in activitiesFromDb)
+        {
+            _dbContext.ActivityRoleMappings.Add(new ActivityRoleMapping
+            {
+                RoleId = role.Id,
+                ActivityId = activity.Id,
+                StatusCode = 1,
+                CreatedBy = request.CreatedBy,
+                UpdatedBy = request.UpdatedBy,
+                CreatedOn = DateTimeOffset.UtcNow,
+                UpdatedOn = DateTimeOffset.UtcNow
+            });
+        }
     }
+
+    // 4. SAVE ALL CHANGES (IMPORTANT)
+    await _dbContext.SaveChangesAsync(cancellationToken);
+
+    return MapRoleResponse(role);
+}
 
     public async Task<IReadOnlyList<RoleResponseDto>> GetRolesForCompanyAsync(
         int companyId,
