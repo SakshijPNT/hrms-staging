@@ -1,109 +1,39 @@
 /* =========================
    GLOBAL
 ========================= */
-
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-  font-family: Arial, sans-serif;
+}
+
+html,
+body,
+button,
+input,
+textarea,
+select,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+span,
+a,
+label {
+  font-family: 'Inter', sans-serif;
 }
 
 body {
-  background-color: #f4f6f9;
-  color: #333;
+  background: #f4f7fb;
+  color: #0f172a;
+
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* =========================
-   LOGIN PAGE
-========================= */
-
-.login-container {
-  display: flex;
-  min-height: 100vh;
-}
-
-/* LEFT SECTION */
-
-.left-section {
-  flex: 1;
-  background: linear-gradient(
-    135deg,
-    #1e3c72,
-    #2a5298
-  );
-
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 40px;
-}
-
-.branding-content {
-  text-align: center;
-  color: white;
-}
-
-.branding-content h1 {
-  font-size: 56px;
-  margin-bottom: 20px;
-}
-
-.branding-content p {
-  font-size: 24px;
-}
-
-/* RIGHT SECTION */
-
-.right-section {
-  flex: 1;
-
-  display: flex;
-  justify-content: center;
-  align-items: center;
-
-  padding: 30px;
-}
-
-.login-form {
-  width: 100%;
-  max-width: 420px;
-
-  background: white;
-
-  padding: 40px;
-
-  border-radius: 16px;
-
-  box-shadow: 0px 6px 20px
-    rgba(0, 0, 0, 0.1);
-}
-
-.login-form h2 {
-  text-align: center;
-
-  margin-bottom: 30px;
-
-  font-size: 36px;
-
-  color: #1e3c72;
-}
-
-.input-group {
-  margin-bottom: 22px;
-}
-
-.input-group label {
-  display: block;
-
-  margin-bottom: 8px;
-
-  font-weight: 600;
-
-  color: #333;
-}
-
-.input-group input,
 .act-search,
 .act-form-field textarea,
 .act-form-field select {
@@ -122,23 +52,6 @@ body {
   transition: 0.3s;
 }
 
-.act-form-field input{
-  width: auto;
-
-  padding: 14px;
-
-  border: 1px solid #ccc;
-
-  border-radius: 10px;
-
-  font-size: 15px;
-
-  outline: none;
-
-  transition: 0.3s;
-}
-
-.input-group input:focus,
 .act-search:focus,
 .act-form-field input:focus,
 .act-form-field textarea:focus,
@@ -151,7 +64,7 @@ body {
 
 /* BUTTONS */
 
-.login-form button,
+
 .act-new-btn,
 .act-submit-btn,
 .act-cancel-btn {
@@ -168,14 +81,12 @@ body {
   transition: 0.3s;
 }
 
-.login-form button,
 .act-new-btn,
 .act-submit-btn {
   background: #1e3c72;
   color: white;
 }
 
-.login-form button:hover,
 .act-new-btn:hover,
 .act-submit-btn:hover {
   background: #16325c;
@@ -185,16 +96,7 @@ body {
   background: #dcdcdc;
 }
 
-/* ERROR */
 
-.error,
-.form-error {
-  color: red;
-
-  text-align: center;
-
-  margin-bottom: 15px;
-}
 
 /* =========================
    ROLES PAGE
@@ -315,7 +217,36 @@ body {
   z-index: 1000;
 }
 
+/*.act-modal-overlay {
+  position: fixed;
 
+  inset: 0;
+
+  background: rgba(0, 0, 0, 0.5);
+
+  display: flex;
+
+  justify-content: center;
+
+  align-items: flex-start;
+
+  padding-top: 40px;
+
+  overflow-y: auto;
+
+  z-index: 1000;
+}*/
+
+/*.act-modal {
+  background: white;
+
+  width: 90%;
+  max-width: 700px;
+
+  border-radius: 16px;
+
+  padding: 30px;
+}*/
 
 .act-modal {
   background: white;
@@ -390,29 +321,6 @@ body {
 ========================= */
 
 @media (max-width: 768px) {
-  .login-container {
-    flex-direction: column;
-  }
-
-  .left-section {
-    min-height: 35vh;
-  }
-
-  .branding-content h1 {
-    font-size: 38px;
-  }
-
-  .branding-content p {
-    font-size: 18px;
-  }
-
-  .right-section {
-    padding: 20px;
-  }
-
-  .login-form {
-    padding: 30px 20px;
-  }
 
   .act-page-header {
     flex-direction: column;
@@ -428,17 +336,6 @@ body {
 }
 
 @media (max-width: 480px) {
-  .branding-content h1 {
-    font-size: 32px;
-  }
-
-  .branding-content p {
-    font-size: 16px;
-  }
-
-  .login-form h2 {
-    font-size: 28px;
-  }
 
   .act-title {
     font-size: 30px;
@@ -867,12 +764,6 @@ body {
   margin-bottom: 12px;
   color: #475569;
 }
-
-
-
-
-
-
 
 /* =========================
    ATTENDANCE SECTION
