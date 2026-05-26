@@ -5,7 +5,9 @@ import { useNavigate } from 'react-router-dom'
 
 import api from '../services/api'
 
-import '../styles/Style.css'
+import '../styles/Login.css'
+
+import { FiEye, FiEyeOff } from 'react-icons/fi'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -46,10 +48,13 @@ export default function Login() {
     } catch (err: unknown) {
       setError(
         (err as { response?: { data?: { message?: string } } }).response?.data?.message ||
-          'Invalid Email ID or Password'
+        'Invalid Email ID or Password'
       )
     }
   }
+
+  const [showPassword, setShowPassword] =
+    useState<boolean>(false)
 
   return (
     <div className="login-container">
@@ -67,6 +72,13 @@ export default function Login() {
 
       {/* Right Side */}
       <div className="right-section">
+        <div className="mobile-branding">
+  <h1>HRMS Portal</h1>
+
+  <p>
+    Human Resource Management System
+  </p>
+</div>
         <form
           className="login-form"
           onSubmit={handleLogin}
@@ -99,18 +111,40 @@ export default function Login() {
               Password
             </label>
 
-            <input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) =>
-                setPassword(
-                  e.target.value
-                )
-              }
-              required
-            />
+            <div className="password-input-wrapper">
+              <input
+                id="password"
+                type={
+                  showPassword
+                    ? 'text'
+                    : 'password'
+                }
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) =>
+                  setPassword(
+                    e.target.value
+                  )
+                }
+                required
+              />
+
+              <button
+                type="button"
+                className="password-toggle"
+                onClick={() =>
+                  setShowPassword(
+                    !showPassword
+                  )
+                }
+              >
+                {showPassword ? (
+                  <FiEyeOff />
+                ) : (
+                  <FiEye />
+                )}
+              </button>
+            </div>
           </div>
 
           {/* Error */}
@@ -119,6 +153,17 @@ export default function Login() {
               {error}
             </p>
           )}
+
+          <div className="form-options">
+            <label className="remember-me">
+              <input type="checkbox" />
+              Remember me
+            </label>
+
+            <a href="#" className="forgot-password">
+              Forgot Password?
+            </a>
+          </div>
 
           {/* Button */}
           <button type="submit">
