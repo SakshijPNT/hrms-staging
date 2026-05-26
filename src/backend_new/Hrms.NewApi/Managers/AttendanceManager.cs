@@ -18,34 +18,21 @@ public class AttendanceManager : IAttendanceManager
         _dbContext = dbContext;
     }
 
-public async Task<AttendanceResponseDto> CheckInAsync(
-    int userId,
-    CancellationToken cancellationToken = default)
+public async Task<AttendanceResponseDto> CheckInAsync(int userId,CancellationToken cancellationToken = default)
 {
     try
     {
         Console.WriteLine("STEP 1");
 
         var user = await _dbContext.UserMasters
-            .FirstOrDefaultAsync(
-                x => x.Id == userId
-                && x.StatusCode == 1,
-                cancellationToken);
-
+            .FirstOrDefaultAsync(x => x.Id == userId&& x.StatusCode == 1,cancellationToken);
         Console.WriteLine("STEP 2");
 
-        var companyPolicy =
-            await GetCompanyPolicyAsync(
-                user.CompanyId,
-                cancellationToken);
-
+        var companyPolicy =await GetCompanyPolicyAsync(user.CompanyId,cancellationToken);
         Console.WriteLine("STEP 3");
 
-        var company =
-            await _dbContext.CompanyMasters
-            .FirstOrDefaultAsync(
-                x => x.Id == user.CompanyId,
-                cancellationToken);
+        var company =await _dbContext.CompanyMasters
+            .FirstOrDefaultAsync(x => x.Id == user.CompanyId,cancellationToken);
 
         Console.WriteLine("STEP 4");
 

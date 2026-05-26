@@ -10,5 +10,5 @@ public interface IAttendanceManager
 
     Task<AttendanceResponseDto> CheckOutAsync(int userId,CancellationToken cancellationToken = default);
 
-    Task<AttendanceResponseDto?> GetTodayAttendanceAsync(int userId,CancellationToken cancellationToken = default);
+   Task<AttendanceResponseDto?> GetTodayAttendanceAsync(int userId,CancellationToken cancellationToken = default);
 }

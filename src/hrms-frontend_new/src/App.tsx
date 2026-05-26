@@ -10,7 +10,8 @@ import Dashboard from './pages/Dashboard'
 import { RolesPage } from './pages/Roles'
 import { UsersPage } from './pages/Users'
 import { MyApplicationsPage } from './pages/MyApplications'
-
+import { CompanyPage } from './pages/Company'
+import  { PolicyPage } from './pages/Policy'
 
 function App() {
   return (
@@ -54,7 +55,17 @@ function App() {
         element={<MyApplicationsPage />}
         />
 
-      
+        {/* Company */}
+        <Route
+          path="/company-configuration"
+          element={<CompanyPage />}
+        />
+
+        {/* Policy */}
+        <Route
+          path="/policy-configuration"
+          element={<PolicyPage />}
+        />
 
       </Routes>
     </BrowserRouter>

@@ -182,23 +182,20 @@ public class UserManager : IUserManager
         };
     }
 
-    public async Task UpdateUserStatusAsync(
-    int id,
-    int statusCode,
-    CancellationToken cancellationToken = default)
-{
-    var user = await _dbContext.UserMasters
-        .FirstOrDefaultAsync(
-            x => x.Id == id,
-            cancellationToken)
-        ?? throw new KeyNotFoundException(
-            $"User with id {id} does not exist.");
+    public async Task UpdateUserStatusAsync(int id,int statusCode,CancellationToken cancellationToken = default)
+            {
+                var user = await _dbContext.UserMasters
+                    .FirstOrDefaultAsync(
+                        x => x.Id == id,
+                        cancellationToken)
+                    ?? throw new KeyNotFoundException(
+                        $"User with id {id} does not exist.");
 
-    user.StatusCode = (short)statusCode;
+                user.StatusCode = (short)statusCode;
 
-    user.UpdatedOn = DateTimeOffset.UtcNow;
+                user.UpdatedOn = DateTimeOffset.UtcNow;
 
-    await _dbContext.SaveChangesAsync(
-        cancellationToken);
-}
+                await _dbContext.SaveChangesAsync(
+                    cancellationToken);
+            }
 }

@@ -38,6 +38,7 @@ public class AttendanceController : ControllerBase
         return Ok(response);
     }
 
+
     [HttpPost("check-out")]
     public async Task<IActionResult> CheckOut(CancellationToken cancellationToken)
     {

@@ -86,9 +86,7 @@ public async Task<IActionResult> DeleteCompany(int companyId,CancellationToken c
                         deletedBy,
                         cancellationToken);
 
-                    return Ok(new
-                    {
-                        message = "Company deleted successfully.",
+                    return Ok(new{message = "Company deleted successfully.",
                         success = result
                     });
                 }
@@ -107,4 +105,82 @@ public async Task<IActionResult> DeleteCompany(int companyId,CancellationToken c
                     });
                 }
             }
+
+
+[HttpPut]
+public async Task<IActionResult> UpdateCompany([FromBody] CompanyUpdateDto request,CancellationToken cancellationToken)
+{
+    try
+    {
+        var session = GetSessionInfo();
+
+        if (session is null)
+        {
+            return Unauthorized(new
+            {
+                message = "No active session."
+            });
+        }
+
+        var result =
+            await _companyManager.UpdateCompanyAsync(request,session.UserId,cancellationToken);
+
+        return Ok(new{
+            message = "Company updated successfully.",
+            data = result
+        });
+    }
+    catch (KeyNotFoundException ex)
+    {
+        return NotFound(new
+        {
+            message = ex.Message
+        });
+    }
+    catch (Exception ex)
+    {
+        return BadRequest(new
+        {
+            message = ex.Message
+        });
+    }
+}
+
+    [HttpPut("status")]
+public async Task<IActionResult> UpdateCompanyStatus([FromBody] CompanyStatusUpdateDto request,CancellationToken cancellationToken)
+{
+    try
+    {
+        var session = GetSessionInfo();
+        if (session is null)
+            {
+                return Unauthorized(new
+            {
+                message = "No active session."
+            });
+            }
+
+        var result =await _companyManager.UpdateCompanyStatusAsync(request,session.UserId,cancellationToken);
+
+        return Ok(new
+        {
+            message =
+                "Company status updated successfully.",success = result
+        });
+    }
+    catch (KeyNotFoundException ex)
+    {
+        return NotFound(new
+        {
+            message = ex.Message
+        });
+    }
+    catch (Exception ex)
+    {
+        return BadRequest(new
+        {
+            message = ex.Message
+        });
+    }
+}
 }

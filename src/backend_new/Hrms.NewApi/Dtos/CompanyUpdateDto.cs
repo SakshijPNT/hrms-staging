@@ -1,12 +1,12 @@
 namespace Hrms.NewApi.Dtos;
 
-public class CompanyListItemDto
+public class CompanyUpdateDto
 {
     public int Id { get; set; }
 
-    public string CompanyName { get; set; } = null!;
+    public string CompanyName { get; set; } = string.Empty;
 
-    public string CompanyCode { get; set; } = null!;
+    public string CompanyCode { get; set; } = string.Empty;
 
     public string? CompanyPhone { get; set; }
 
@@ -20,7 +20,7 @@ public class CompanyListItemDto
 
     public string? Pincode { get; set; }
 
-    public string Timezone { get; set; } = null!;
+    public string? Timezone { get; set; }
 
-    public short StatusCode { get; set; }
+    public int StatusCode { get; set; }
 }
