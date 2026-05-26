@@ -9,4 +9,8 @@ public interface ICompanyManager
     Task<IReadOnlyList<CompanyListItemDto>> GetCompaniesAsync(int loggedInUserCompanyId,int loggedInUserRoleId,CancellationToken cancellationToken = default);
 
     Task<bool> DeleteCompanyAsync(int companyId,int deletedBy,CancellationToken cancellationToken = default);
+
+    Task<CompanyResponseDto> UpdateCompanyAsync(CompanyUpdateDto request,int updatedBy, CancellationToken cancellationToken = default);
+
+    Task<bool> UpdateCompanyStatusAsync(CompanyStatusUpdateDto request,int updatedBy,CancellationToken cancellationToken = default);
 }

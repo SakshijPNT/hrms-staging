@@ -16,6 +16,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<IUserLeaveManager, UserLeaveManager>();
         services.AddScoped<ICompanyManager, CompanyManager>();
         services.AddScoped<IAttendanceManager, AttendanceManager>();
+        services.AddScoped<IPolicyManager, PolicyManager>();
         return services;
     }
 }

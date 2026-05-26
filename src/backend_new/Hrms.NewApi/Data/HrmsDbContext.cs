@@ -22,7 +22,9 @@ public class HrmsDbContext : DbContext
     public DbSet<UserLeaveBalance> UserLeaveBalances => Set<UserLeaveBalance>();
     public DbSet<UserAttendanceLog> UserAttendanceLogs => Set<UserAttendanceLog>();
     public DbSet<HolidayList> HolidayLists => Set<HolidayList>();
-    public DbSet<CompanyPolicies> CompanyPolicies => Set<CompanyPolicies>();
+    public DbSet<CompanyPolicies> 
+    
+    CompanyPolicies => Set<CompanyPolicies>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
