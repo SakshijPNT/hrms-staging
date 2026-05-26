@@ -146,7 +146,7 @@ body {
 .login-form .input-group input:focus {
   outline: none;
 
-  border-color: #2948a8;
+  border-color: var(--primary);
 
   box-shadow:
     0 0 0 3px rgba(41, 72, 168, 0.08);
