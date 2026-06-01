@@ -3,15 +3,17 @@ import Layout from './Layout'
 import '../styles/Style.css'
 import api from '../services/api'
 import type { AxiosError } from 'axios'
+import Calendar from 'react-calendar'
+import 'react-calendar/dist/Calendar.css'
 
 export default function Dashboard() {
 
   interface Attendance {
-  checkInTime: string | null
-  checkOutTime: string | null
-  workedHours: number
-  attendanceStatus: string
-}
+    checkInTime: string | null
+    checkOutTime: string | null
+    workedHours: number
+    attendanceStatus: string
+  }
 
   const [attendance, setAttendance] = useState<Attendance | null>(null)
 
@@ -20,12 +22,14 @@ export default function Dashboard() {
 
   const [loading, setLoading] =
     useState(false)
- 
-    const session = JSON.parse(
-  localStorage.getItem('session') || '{}'
-)
 
-const timezone =session.timezone || 'Asia/Kolkata'
+  const session = JSON.parse(
+    localStorage.getItem('session') || '{}'
+  )
+
+  const timezone = session.timezone || 'Asia/Kolkata'
+
+  const [selectedDate, setSelectedDate] = useState(new Date())
 
   // =========================================
   // FETCH TODAY ATTENDANCE
@@ -54,31 +58,31 @@ const timezone =session.timezone || 'Asia/Kolkata'
   // PAGE LOAD
   // =========================================
 
-useEffect(() => {
+  useEffect(() => {
 
-   const loadAttendance = async () => {
+    const loadAttendance = async () => {
 
-    try {
+      try {
 
-    const response =
-    await api.get('/attendance/today')
+        const response =
+          await api.get('/attendance/today')
 
-    setAttendance(response.data)
-    } catch {
-      console.log(
-        'No attendance found for today'
-      )
-      setAttendance(null)
+        setAttendance(response.data)
+      } catch {
+        console.log(
+          'No attendance found for today'
+        )
+        setAttendance(null)
+      }
     }
-  }
 
-  loadAttendance()
+    loadAttendance()
 
-  const timer = setInterval(() => {setCurrentTime(new Date())}, 1000)
+    const timer = setInterval(() => { setCurrentTime(new Date()) }, 1000)
 
-  return () => clearInterval(timer)
+    return () => clearInterval(timer)
 
-}, [])
+  }, [])
 
   // =========================================
   // CHECK IN
@@ -99,13 +103,13 @@ useEffect(() => {
 
     } catch (error: unknown) {
 
-       const axiosError =
-      error as AxiosError<{ message?: string }>
+      const axiosError =
+        error as AxiosError<{ message?: string }>
 
-    alert(
-      axiosError.response?.data?.message ||
-      'Check-in failed'
-    )
+      alert(
+        axiosError.response?.data?.message ||
+        'Check-in failed'
+      )
 
     } finally {
 
@@ -132,12 +136,12 @@ useEffect(() => {
 
     } catch (error: unknown) {
 
-       const axiosError =
-      error as AxiosError<{ message?: string }>
+      const axiosError =
+        error as AxiosError<{ message?: string }>
 
       alert(
         axiosError.response?.data?.message ||
-      'Check-out failed'
+        'Check-out failed'
       )
 
     } finally {
@@ -157,10 +161,10 @@ useEffect(() => {
     return new Date(time).toLocaleTimeString(
       'en-US',
       {
-      timeZone: timezone,
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
+        timeZone: timezone,
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
       }
     )
   }
@@ -192,13 +196,13 @@ useEffect(() => {
           <h1 className="attendance-time">
 
             {currentTime.toLocaleTimeString(
-            'en-US',
-            {
-              timeZone: timezone,
-              hour: '2-digit',
-              minute: '2-digit',
-              second: '2-digit',
-              hour12: true,
+              'en-US',
+              {
+                timeZone: timezone,
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: true,
               }
             )}
 
@@ -254,8 +258,7 @@ useEffect(() => {
 
             <span>STATUS</span>
 
-            <strong>
-
+            <strong className="attendance-status">
               {
                 attendance?.attendanceStatus ||
                 'NOT CHECKED IN'
@@ -274,11 +277,10 @@ useEffect(() => {
           {/* CHECK IN */}
 
           <button
-            className={`check-btn check-in-btn ${
-              attendance?.checkInTime
-                ? 'active-btn'
-                : ''
-            }`}
+            className={`check-btn check-in-btn ${attendance?.checkInTime
+              ? 'active-btn'
+              : ''
+              }`}
             onClick={handleCheckIn}
             disabled={
               !!attendance?.checkInTime || loading
@@ -308,6 +310,34 @@ useEffect(() => {
           </button>
 
         </div>
+
+      </div>
+
+      <div className="dashboard-bottom-grid">
+
+        <div className="attendance-calendar-card">
+
+          <div className="calendar-card-header">
+            <h3>Attendance Overview</h3>
+          </div>
+
+          <Calendar
+            onChange={(value) =>
+              setSelectedDate(value as Date)
+            }
+            value={selectedDate}
+            className="hrms-calendar"
+          />
+
+          <div className="attendance-legend">
+  <div><span className="legend-dot green"></span>Present</div>
+  <div><span className="legend-dot red"></span>Absent</div>
+  <div><span className="legend-dot orange"></span>Half Day</div>
+  <div><span className="legend-dot blue"></span>Leave</div>
+</div>
+
+        </div>
+
 
       </div>
 

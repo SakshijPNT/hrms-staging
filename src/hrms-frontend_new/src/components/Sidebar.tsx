@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate  } from 'react-router-dom'
 
 import {
   MdDashboardCustomize,
@@ -122,12 +122,26 @@ const moduleRoutes: Record<
   },
 }
 
+
+
 export default function Sidebar({
+
   groups,
   openGroup,
   toggleGroup,
   sidebarOpen,
 }: SidebarProps) {
+
+    const navigate = useNavigate()
+
+    function handleLogout() {
+
+  // future token cleanup can go here
+
+  localStorage.clear()
+
+  navigate('/login')
+}
 
   return (
 
@@ -289,7 +303,10 @@ export default function Sidebar({
       </div>
 
       {/* LOGOUT */}
-      <button className="logout-btn">
+      <button
+  className="logout-btn"
+  onClick={handleLogout}
+>
 
         <MdLogout className="menu-icon" />
 

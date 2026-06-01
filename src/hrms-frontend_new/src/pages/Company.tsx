@@ -3,6 +3,9 @@ import '../styles/Style.css'
 import api from '../services/api'
 import Layout from '../pages/Layout'
 import type { AxiosError } from 'axios'
+import { FiSearch } from 'react-icons/fi'
+import { MdEdit } from "react-icons/md";
+import Select from 'react-select'
 
 interface CompanyItem {
   id: number
@@ -36,14 +39,14 @@ export function CompanyPage() {
     useState('')
 
   const session = JSON.parse(
-  localStorage.getItem('session') || '{}'
-)
-
-const hasCompanyAccess =
-  session.activities?.some(
-    (activity: { activityCode: string }) =>
-      activity.activityCode === 'A0'
+    localStorage.getItem('session') || '{}'
   )
+
+  const hasCompanyAccess =
+    session.activities?.some(
+      (activity: { activityCode: string }) =>
+        activity.activityCode === 'A0'
+    )
 
   const [form, setForm] = useState({
     companyName: '',
@@ -67,9 +70,15 @@ const hasCompanyAccess =
     'Asia/Singapore',
   ]
 
- 
+  const [currentPage, setCurrentPage] = useState(1)
 
+  const companiesPerPage = 5
 
+  const indexOfLastCompany =
+    currentPage * companiesPerPage
+
+  const indexOfFirstCompany =
+    indexOfLastCompany - companiesPerPage
 
   async function fetchCompanies() {
 
@@ -90,16 +99,30 @@ const hasCompanyAccess =
     }
   }
 
-            useEffect(() => {
+  useEffect(() => {
 
-            async function loadCompanies() {
+    async function loadCompanies() {
 
-                await fetchCompanies()
-            }
+      await fetchCompanies()
+    }
 
-            loadCompanies()
+    loadCompanies()
 
-            }, [])
+  }, [])
+
+  useEffect(() => {
+
+    if (modalOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = 'auto'
+    }
+
+    return () => {
+      document.body.style.overflow = 'auto'
+    }
+
+  }, [modalOpen])
 
   const filteredCompanies = useMemo(() => {
 
@@ -119,6 +142,17 @@ const hasCompanyAccess =
     )
 
   }, [companies, search])
+
+
+  const currentCompanies =
+    filteredCompanies.slice(
+      indexOfFirstCompany,
+      indexOfLastCompany
+    )
+
+  const totalPages = Math.ceil(
+    filteredCompanies.length / companiesPerPage
+  )
 
   function openModal() {
 
@@ -198,55 +232,55 @@ const hasCompanyAccess =
   }*/
 
   async function toggleCompanyStatus(
-  companyId: number,
-  currentStatus: number
+    companyId: number,
+    currentStatus: number
   ) {
 
-  try {
+    try {
 
-    const newStatus =
-      currentStatus === 1 ? 0 : 1
+      const newStatus =
+        currentStatus === 1 ? 0 : 1
 
-    const confirmMessage =
-      currentStatus === 1
-        ? 'Are you sure you want to deactivate this company?'
-        : 'Are you sure you want to activate this company?'
+      const confirmMessage =
+        currentStatus === 1
+          ? 'Are you sure you want to deactivate this company?'
+          : 'Are you sure you want to activate this company?'
 
-    const confirmed =
-      window.confirm(confirmMessage)
+      const confirmed =
+        window.confirm(confirmMessage)
 
-    if (!confirmed) {
-      return
-    }
+      if (!confirmed) {
+        return
+      }
 
-    await api.put('/Company/status', {
-      id: companyId,
-      statusCode: newStatus,
-    })
+      await api.put('/Company/status', {
+        id: companyId,
+        statusCode: newStatus,
+      })
 
-    setCompanies((prev) =>
-      prev.map((company) =>
-        company.id === companyId
-          ? {
+      setCompanies((prev) =>
+        prev.map((company) =>
+          company.id === companyId
+            ? {
               ...company,
               statusCode: newStatus,
             }
-          : company
+            : company
+        )
       )
-    )
 
-  } catch (error) {
+    } catch (error) {
 
-    console.error(
-      'Failed to update company status',
-      error
-    )
+      console.error(
+        'Failed to update company status',
+        error
+      )
 
-    alert(
-      'Failed to update company status'
-    )
+      alert(
+        'Failed to update company status'
+      )
+    }
   }
-}
 
   async function handleSubmit(
     event: FormEvent<HTMLFormElement>
@@ -324,45 +358,29 @@ const hasCompanyAccess =
       <div className="act-page">
 
         {/* Header */}
-        <div className="act-page-header">
-
-          <div>
-
-            <nav className="act-breadcrumb">
-              <span className="act-breadcrumb-link">
-                Company
-              </span>
-            </nav>
-
-            <h1 className="act-title">
-              Companies
-            </h1>
-
-          </div>
-
-      {hasCompanyAccess && (
-  <button
-    className="act-new-btn"
-    onClick={openModal}
-  >
-    + Company
-  </button>
-)}
-
-        </div>
-
-        {/* Search */}
         <div className="act-toolbar">
 
-          <input
-            className="act-search"
-            type="text"
-            placeholder="Search company"
-            value={search}
-            onChange={(e) =>
-              setSearch(e.target.value)
-            }
-          />
+          <div className="act-search-wrapper">
+            <FiSearch className="act-search-icon" />
+            <input
+              className="act-search"
+              type="text"
+              placeholder="Search company"
+              value={search}
+              onChange={(e) =>
+                setSearch(e.target.value)
+              }
+            />
+          </div>
+
+          {hasCompanyAccess && (
+            <button
+              className="act-new-btn"
+              onClick={openModal}
+            >
+              + Company
+            </button>
+          )}
 
         </div>
 
@@ -381,10 +399,10 @@ const hasCompanyAccess =
                 <th>Timezone</th>
                 <th>Status</th>
                 {hasCompanyAccess && (
-                <th>Edit</th>
+                  <th>Edit</th>
                 )}
-                
-                
+
+
               </tr>
 
             </thead>
@@ -404,7 +422,7 @@ const hasCompanyAccess =
 
               ) : (
 
-                filteredCompanies.map((company) => (
+                currentCompanies.map((company) => (
 
                   <tr key={company.id}>
 
@@ -428,58 +446,58 @@ const hasCompanyAccess =
 
                     <td>
 
-                    <div className="role-actions">
+                      <div className="role-actions">
 
-                    <span
-                    className={
-                    company.statusCode === 1
-                    ? 'role-status role-status-active'
-                    : 'role-status role-status-inactive'
-                    }
-                    >
-                    {company.statusCode === 1
-                        ? 'Active'
-                        : 'Inactive'}
-                    </span>
+                        <span
+                          className={
+                            company.statusCode === 1
+                              ? 'role-status role-status-active'
+                              : 'role-status role-status-inactive'
+                          }
+                        >
+                          {company.statusCode === 1
+                            ? 'Active'
+                            : 'Inactive'}
+                        </span>
 
                         {hasCompanyAccess && (
-                        <label className="role-switch">
+                          <label className="role-switch">
 
-                        <input
-                            type="checkbox"
-                            aria-label="Toggle company status"
-                            checked={company.statusCode === 1}
-                            onChange={() =>
-                            toggleCompanyStatus(
-                            company.id,
-                            company.statusCode
-                        )
-                    }
-                    />
+                            <input
+                              type="checkbox"
+                              aria-label="Toggle company status"
+                              checked={company.statusCode === 1}
+                              onChange={() =>
+                                toggleCompanyStatus(
+                                  company.id,
+                                  company.statusCode
+                                )
+                              }
+                            />
 
                             <span className="role-slider" />
 
-                            </label>
-                            )}
+                          </label>
+                        )}
 
-                        </div>
+                      </div>
 
-                        </td>
+                    </td>
 
-                            {hasCompanyAccess && (
-                            <td>
+                    {hasCompanyAccess && (
+                      <td>
 
-                                <button
-                                className="edit-btn"
-                                onClick={() =>
-                                    handleEdit(company)
-                                }
-                                >
-                                Edit
-                                </button>
+                        <button
+                          className="edit-btn"
+                          onClick={() =>
+                            handleEdit(company)
+                          }
+                        >
+                          <MdEdit />
+                        </button>
 
-                            </td>
-                            )}
+                      </td>
+                    )}
 
                   </tr>
 
@@ -489,6 +507,42 @@ const hasCompanyAccess =
             </tbody>
 
           </table>
+
+          <div className="role-pagination">
+
+            <div className="pagination-info">
+              Showing {currentCompanies.length} of {filteredCompanies.length}
+            </div>
+
+            <div className="pagination-controls">
+
+              <button
+                className="pagination-btn"
+                disabled={currentPage === 1}
+                onClick={() =>
+                  setCurrentPage((prev) => prev - 1)
+                }
+              >
+                &#8249;
+              </button>
+
+              <span className="pagination-text">
+                Page {currentPage} of {totalPages}
+              </span>
+
+              <button
+                className="pagination-btn"
+                disabled={currentPage === totalPages}
+                onClick={() =>
+                  setCurrentPage((prev) => prev + 1)
+                }
+              >
+                &#8250;
+              </button>
+
+            </div>
+
+          </div>
 
         </div>
 
@@ -601,7 +655,7 @@ const hasCompanyAccess =
                       Timezone
                     </span>
 
-                    <select
+                    {/* <select
                       value={form.timezone}
                       onChange={(e) =>
                         setForm((c) => ({
@@ -623,7 +677,31 @@ const hasCompanyAccess =
 
                       ))}
 
-                    </select>
+                    </select> */}
+
+                    <Select
+                      menuPortalTarget={document.body}
+                      menuPosition="fixed"
+                      menuPlacement="auto"
+                      menuShouldScrollIntoView={false}
+                      classNamePrefix="act-select"
+                      options={timezones.map((tz) => ({
+                        value: tz,
+                        label: tz,
+                      }))}
+                      value={{
+                        value: form.timezone,
+                        label: form.timezone,
+                      }}
+                      onChange={(selected) =>
+                        setForm((c) => ({
+                          ...c,
+                          timezone: selected
+                            ? selected.value
+                            : '',
+                        }))
+                      }
+                    />
 
                   </label>
 
@@ -637,8 +715,8 @@ const hasCompanyAccess =
                       Address
                     </span>
 
-                    <input
-                      type="text"
+                    <textarea
+                      rows={3}
                       value={form.address}
                       onChange={(e) =>
                         setForm((c) => ({
@@ -650,6 +728,13 @@ const hasCompanyAccess =
                     />
 
                   </label>
+
+
+
+                </div>
+
+                <div className="act-form-row">
+
 
                   <label className="act-form-field">
 
@@ -671,10 +756,6 @@ const hasCompanyAccess =
 
                   </label>
 
-                </div>
-
-                <div className="act-form-row">
-
                   <label className="act-form-field">
 
                     <span>
@@ -694,6 +775,12 @@ const hasCompanyAccess =
                     />
 
                   </label>
+
+
+
+                </div>
+
+                <div className="act-form-row">
 
                   <label className="act-form-field">
 
@@ -715,10 +802,6 @@ const hasCompanyAccess =
 
                   </label>
 
-                </div>
-
-                <div className="act-form-row">
-
                   <label className="act-form-field">
 
                     <span>
@@ -739,6 +822,7 @@ const hasCompanyAccess =
 
                   </label>
 
+
                 </div>
 
                 {error && (
@@ -749,28 +833,28 @@ const hasCompanyAccess =
 
                 )}
 
-                <div className="act-modal-actions">
-
-                  <button
-                    type="button"
-                    className="act-cancel-btn"
-                    onClick={closeModal}
-                  >
-                    Cancel
-                  </button>
-
-                  <button
-                    type="submit"
-                    className="act-submit-btn"
-                  >
-                    {editingCompanyId
-                      ? 'Update Company'
-                      : 'Create Company'}
-                  </button>
-
-                </div>
-
               </form>
+
+              <div className="act-modal-actions">
+
+                <button
+                  type="button"
+                  className="act-cancel-btn"
+                  onClick={closeModal}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  className="act-submit-btn"
+                >
+                  {editingCompanyId
+                    ? 'Update Company'
+                    : 'Create Company'}
+                </button>
+
+              </div>
 
             </div>
 

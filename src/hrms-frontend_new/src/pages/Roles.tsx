@@ -1,10 +1,15 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import React, {
+  useMemo,
+  useState,
+  type FormEvent,
+} from 'react'
 import { useEffect, useRef } from 'react'
 import '../styles/Style.css'
 import api from '../services/api'
 import Layout from '../pages/Layout'
-
-
+import { FiSearch, FiPlus } from 'react-icons/fi'
+import { MdEdit } from 'react-icons/md'
+import Select, { components } from 'react-select'
 
 interface RoleManagementItem {
   id: number
@@ -21,85 +26,99 @@ interface ActivityItem {
 
 
 export function RolesPage() {
-   
-    const [activities, setActivities] = useState<ActivityItem[]>([])
-    const [roles, setRoles] = useState<RoleManagementItem[]>([])
-    const [search, setSearch] = useState('')
-   
-    const [modalOpen, setModalOpen] = useState(false)
-    const [editingRoleId, setEditingRoleId] = useState<number | null>(null)
-    const [editingStatusCode, setEditingStatusCode] = useState<number>(1)
-    const [currentPage, setCurrentPage] = useState(1)
-    const [activityDropdownOpen, setActivityDropdownOpen] = useState(false)
-    const activityRef = useRef<HTMLDivElement>(null)
 
-    interface RoleApiResponse {
-  id: number
-  roleName: string
-  description: string
-  activityIds: number[]
-  statusCode: number
-}
+  const [activities, setActivities] = useState<ActivityItem[]>([])
+  const [roles, setRoles] = useState<RoleManagementItem[]>([])
+  const [search, setSearch] = useState('')
 
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editingRoleId, setEditingRoleId] = useState<number | null>(null)
+  const [editingStatusCode, setEditingStatusCode] = useState<number>(1)
+  const [currentPage, setCurrentPage] = useState(1)
+  // const [activityDropdownOpen, setActivityDropdownOpen] = useState(false)
+  // const activityRef = useRef<HTMLDivElement>(null)
 
-async function fetchRoles(
-  activityData = activities
-) {
-  try {
-
-    const res = await api.get('/Roles/company')
-
-    const mappedRoles = res.data.map(
-      (role: RoleApiResponse) => ({
-
-        id: role.id,
-        name: role.roleName,
-        description: role.description,
-
-        activity: activityData
-          .filter((a: ActivityItem) =>
-            role.activityIds.includes(a.id)
-          )
-          .map(
-            (a: ActivityItem) =>
-              a.activityName
-          ),
-
-        status: role.statusCode === 1,
-      })
-    )
-
-    setRoles(mappedRoles)
-
-  } catch (err) {
-
-    console.error(
-      'Failed to fetch roles',
-      err
-    )
-
+  interface RoleApiResponse {
+    id: number
+    roleName: string
+    description: string
+    activityIds: number[]
+    statusCode: number
   }
-}
 
 
-useEffect(() => {
-  async function loadData() {
+  async function fetchRoles(
+    activityData = activities
+  ) {
     try {
-      const activityRes = await api.get('/Roles/activities')
 
-      setActivities(activityRes.data)
+      const res = await api.get('/Roles/company')
 
-      await fetchRoles(activityRes.data)
+      const mappedRoles = res.data.map(
+        (role: RoleApiResponse) => ({
+
+          id: role.id,
+          name: role.roleName,
+          description: role.description,
+
+          activity: activityData
+            .filter((a: ActivityItem) =>
+              role.activityIds.includes(a.id)
+            )
+            .map(
+              (a: ActivityItem) =>
+                a.activityName
+            ),
+
+          status: role.statusCode === 1,
+        })
+      )
+
+      setRoles(mappedRoles)
 
     } catch (err) {
-      console.error('Failed loading data', err)
+
+      console.error(
+        'Failed to fetch roles',
+        err
+      )
+
     }
   }
 
-  loadData()
-}, [])
 
-{/*useEffect(() => {
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const activityRes = await api.get('/Roles/activities')
+
+        setActivities(activityRes.data)
+
+        await fetchRoles(activityRes.data)
+
+      } catch (err) {
+        console.error('Failed loading data', err)
+      }
+    }
+
+    loadData()
+  }, [])
+
+    useEffect(() => {
+
+    if (modalOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = 'auto'
+    }
+
+    return () => {
+      document.body.style.overflow = 'auto'
+    }
+
+  }, [modalOpen])
+
+  {/*useEffect(() => {
   async function fetchRoles() {
     try {
       const res = await api.get('/Roles/company')
@@ -128,26 +147,26 @@ useEffect(() => {
   fetchRoles()
 }, [activities])*/}
 
-useEffect(() => {
-  function handleClickOutside(event: MouseEvent) {
-    if (
-      activityRef.current &&
-      !activityRef.current.contains(event.target as Node)
-    ) {
-      setActivityDropdownOpen(false)
-    }
-  }
+  // useEffect(() => {
+  //   function handleClickOutside(event: MouseEvent) {
+  //     if (
+  //       activityRef.current &&
+  //       !activityRef.current.contains(event.target as Node)
+  //     ) {
+  //       setActivityDropdownOpen(false)
+  //     }
+  //   }
 
-  document.addEventListener('mousedown', handleClickOutside)
+  //   document.addEventListener('mousedown', handleClickOutside)
 
-  return () => {
-    document.removeEventListener('mousedown', handleClickOutside)
-  }
-}, [])
+  //   return () => {
+  //     document.removeEventListener('mousedown', handleClickOutside)
+  //   }
+  // }, [])
 
 
   const [form, setForm] = useState({
-    
+
     name: '',
     description: '',
     activityIds: [] as number[],
@@ -161,25 +180,25 @@ useEffect(() => {
 
     return roles.filter(
       (role) =>
-        role.name.toLowerCase().includes(q)) 
-      {/*||
+        role.name.toLowerCase().includes(q))
+    {/*||
         role.description.toLowerCase().includes(q) ||
         role.activity.join(', ').toLowerCase().includes(q),*/}
-    
+
   }, [roles, search])
 
   function openModal() {
-  setEditingRoleId(null)
+    setEditingRoleId(null)
 
-  setForm({
-    name: '',
-    description: '',
-    activityIds: [],
-  })
+    setForm({
+      name: '',
+      description: '',
+      activityIds: [],
+    })
 
-  setError('')
-  setModalOpen(true)
-}
+    setError('')
+    setModalOpen(true)
+  }
 
   function closeModal() {
     setModalOpen(false)
@@ -205,88 +224,88 @@ useEffect(() => {
 }*/}
 
 
-async function toggleRoleStatus(
-  roleId: number,
-  currentStatus: boolean
-) {
-  try {
-    // new status
-    const newStatus = currentStatus ? 0 : 1
+  async function toggleRoleStatus(
+    roleId: number,
+    currentStatus: boolean
+  ) {
+    try {
+      // new status
+      const newStatus = currentStatus ? 0 : 1
 
-    // confirmation message
-    const confirmMessage = currentStatus
-      ? 'Are you sure you want to deactivate this role?'
-      : 'Are you sure you want to activate this role?'
+      // confirmation message
+      const confirmMessage = currentStatus
+        ? 'Are you sure you want to deactivate this role?'
+        : 'Are you sure you want to activate this role?'
 
-    const confirmed = window.confirm(confirmMessage)
+      const confirmed = window.confirm(confirmMessage)
 
-    if (!confirmed) {
+      if (!confirmed) {
+        return
+      }
+
+      // API call
+      await api.put(
+        `/Roles/${roleId}/status`,
+        {
+          statusCode: newStatus
+        }
+      )
+      // refresh table
+      await fetchRoles()
+
+    } catch (error) {
+
+      console.error(
+        'Failed to update role status',
+        error
+      )
+
+      alert('Failed to update role status')
+    }
+  }
+
+  function handleEdit(role: RoleManagementItem) {
+
+    // inactive role check
+    if (!role.status) {
+      alert('First activate this role')
       return
     }
 
-    // API call
-   await api.put(
-  `/Roles/${roleId}/status`,
-  {
-    statusCode: newStatus
-  }
-)
-    // refresh table
-    await fetchRoles()
+    // set edit mode
+    setEditingRoleId(role.id)
 
-  } catch (error) {
+    // keep status
+    setEditingStatusCode(role.status ? 1 : 0)
 
-    console.error(
-      'Failed to update role status',
-      error
-    )
+    // fill form
+    setForm({
+      name: role.name,
+      description: role.description,
 
-    alert('Failed to update role status')
-  }
-}
+      activityIds: activities
+        .filter((a) =>
+          role.activity.includes(a.activityName)
+        )
+        .map((a) => a.id),
+    })
 
-function handleEdit(role: RoleManagementItem) {
-
-  // inactive role check
-  if (!role.status) {
-    alert('First activate this role')
-    return
+    setModalOpen(true)
   }
 
-  // set edit mode
-  setEditingRoleId(role.id)
 
-  // keep status
-  setEditingStatusCode(role.status ? 1 : 0)
+  //   function toggleActivity(activityId: number) {
+  //   setForm((current) => {
+  //     const exists = current.activityIds.includes(activityId)
 
-  // fill form
-  setForm({
-    name: role.name,
-    description: role.description,
-
-    activityIds: activities
-      .filter((a) =>
-        role.activity.includes(a.activityName)
-      )
-      .map((a) => a.id),
-  })
-
-  setModalOpen(true)
-}
-
-
-  function toggleActivity(activityId: number) {
-  setForm((current) => {
-    const exists = current.activityIds.includes(activityId)
-
-    return {
-      ...current,
-      activityIds: exists
-        ? current.activityIds.filter((id) => id !== activityId)
-        : [...current.activityIds, activityId],
-    }
-  })
-}
+  //     return {
+  //       ...current,
+  //       activityIds: exists
+  //         ? current.activityIds.filter((id) => id !== activityId)
+  //         : [...current.activityIds, activityId],
+  //     }
+  //   })
+  // }
 
   {/*function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -313,276 +332,341 @@ function handleEdit(role: RoleManagementItem) {
     closeModal()
   }*/}
 
-      const rolesPerPage = 5
+  const rolesPerPage = 5
 
-      const indexOfLastRole = currentPage * rolesPerPage
+  const indexOfLastRole = currentPage * rolesPerPage
 
-      const indexOfFirstRole =
-      indexOfLastRole - rolesPerPage
+  const indexOfFirstRole =
+    indexOfLastRole - rolesPerPage
 
-      const currentRoles =
-      filteredRoles.slice(
+  const currentRoles =
+    filteredRoles.slice(
       indexOfFirstRole,
       indexOfLastRole
+    )
+
+  const totalPages = Math.ceil(
+    filteredRoles.length / rolesPerPage
   )
 
-      const totalPages = Math.ceil(
-      filteredRoles.length / rolesPerPage
-)
-
-async function handleSubmit(
-  event: FormEvent<HTMLFormElement>
-) {
-  event.preventDefault()
-
-  if (
-    !form.name.trim() ||
-    !form.description.trim() ||
-    form.activityIds.length === 0
+  async function handleSubmit(
+    event: FormEvent<HTMLFormElement>
   ) {
-    setError('All fields are required.')
-    return
-  }
+    event.preventDefault()
 
-  try {
-
-    const payload = {
-      roleName: form.name,
-      description: form.description,
-      activityIds: form.activityIds,
-      statusCode: editingStatusCode,
-      createdBy: 1,
-      updatedBy: 1
+    if (
+      !form.name.trim() ||
+      !form.description.trim() ||
+      form.activityIds.length === 0
+    ) {
+      setError('All fields are required.')
+      return
     }
 
-    // EDIT
-    if (editingRoleId) {
+    try {
 
-      await api.put(
-        `/Roles/${editingRoleId}`,
-        payload
-      )
+      const payload = {
+        roleName: form.name,
+        description: form.description,
+        activityIds: form.activityIds,
+        statusCode: editingStatusCode,
+        createdBy: 1,
+        updatedBy: 1
+      }
 
-    } else {
+      // EDIT
+      if (editingRoleId) {
 
-      // CREATE
-      await api.post(
-        '/Roles',
-        payload
+        await api.put(
+          `/Roles/${editingRoleId}`,
+          payload
+        )
+
+      } else {
+
+        // CREATE
+        await api.post(
+          '/Roles',
+          payload
+        )
+      }
+
+      // refresh table
+      await fetchRoles()
+
+      // reset states
+      setEditingRoleId(null)
+
+      setForm({
+        name: '',
+        description: '',
+        activityIds: [],
+      })
+
+      setError('')
+
+      closeModal()
+
+    } catch (error: unknown) {
+
+      console.error(error)
+
+      setError(
+        (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
+        'Failed to save role'
       )
     }
-
-    // refresh table
-    await fetchRoles()
-
-    // reset states
-    setEditingRoleId(null)
-
-    setForm({
-      name: '',
-      description: '',
-      activityIds: [],
-    })
-
-    setError('')
-
-    closeModal()
-
-  } catch (error: unknown) {
-
-    console.error(error)
-
-    setError(
-      (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
-      'Failed to save role'
-    )
   }
-}
+
+  const activityOptions = activities.map((activity) => ({
+    value: activity.id,
+    label: activity.activityName,
+  }))
+
+
 
   return (
     <Layout title="Roles Management">
-    <div className="act-page">
-      {/* Header */}
-      <div className="act-page-header">
-        <div>
-          <nav className="act-breadcrumb">
-            <span className="act-breadcrumb-link">Roles</span>
-          </nav>
-          <h1 className="act-title">Roles</h1>
+      <div className="act-page">
+        {/* Header */}
+        <div className="act-toolbar">
+
+          <div className="act-search-wrapper">
+            <FiSearch className="act-search-icon" />
+
+            <input
+              className="act-search"
+              type="text"
+              placeholder="Search role"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+
+          <button
+            className="act-new-btn"
+            onClick={openModal}
+          >
+            <FiPlus />
+            Role
+          </button>
+
         </div>
 
-        <button className="act-new-btn" onClick={openModal}>
-          + Role
-        </button>
-      </div>
-
-      {/* Search */}
-      <div className="act-toolbar">
-        <input
-          className="act-search"
-          type="text"
-          placeholder="Search role"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </div>
-
-      {/* Table */}
-      <div className="act-table-wrapper">
+        {/* Table */}
+        <div className="act-table-wrapper">
 
 
-        <table className="act-table role-table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Name</th>
-              <th>Description</th>
-              <th>Activity</th>
-              <th>Status</th>
-              <th>Edit</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {filteredRoles.length === 0 ? (
+          <table className="act-table role-table">
+            <thead>
               <tr>
-                <td colSpan={6} className="act-empty">
-                  No roles found.
-                </td>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Description</th>
+                <th>Activity</th>
+                <th>Status</th>
+                <th>Edit</th>
               </tr>
-            ) : (
-              currentRoles.map((role) => (
-                <tr key={role.id}>
-                  <td className="role-id-cell">{role.id}</td>
-                  <td>{role.name}</td>
-                  <td>{role.description}</td>
-                  <td>{role.activity.join(', ')}</td>
+            </thead>
 
-                  <td>
-                    <div className="role-actions">
-                      <span
-                        className={
-                          role.status
-                            ? 'role-status role-status-active'
-                            : 'role-status role-status-inactive'
-                        }
-                      >
-                        {role.status ? 'Active' : 'Inactive'}
-                      </span>
-
-                      <label className="role-switch">
-                        <input
-                          type="checkbox"
-                          checked={role.status}
-                          aria-label={
-                          role.status
-                          ? 'Deactivate role'
-                          : 'Activate role'
-                        }
-                          onChange={() =>
-                            toggleRoleStatus(
-                              role.id,
-                              role.status
-                          )
-                        }
-                        />
-                        <span className="role-slider" />
-                      </label>
-                    </div>
-              </td>
-
-              <td>
-                <button
-                className="edit-btn"
-                onClick={() => handleEdit(role)}
-                >
-                Edit
-                </button>
-              </td>
-
+            <tbody>
+              {filteredRoles.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="act-empty">
+                    No roles found.
+                  </td>
                 </tr>
-              ))
-            )}
+              ) : (
+                currentRoles.map((role) => (
+                  <tr key={role.id}>
+                    <td className="role-id-cell">{role.id}</td>
+                    <td>{role.name}</td>
+                    <td>{role.description}</td>
+                    <td>{role.activity.join(', ')}</td>
 
-                    
-          </tbody>
-        </table>
+                    <td>
+                      <div className="role-actions">
+                        <span
+                          className={
+                            role.status
+                              ? 'role-status role-status-active'
+                              : 'role-status role-status-inactive'
+                          }
+                        >
+                          {role.status ? 'Active' : 'Inactive'}
+                        </span>
 
-            <div className="role-pagination">
+                        <label className="role-switch">
+                          <input
+                            type="checkbox"
+                            checked={role.status}
+                            aria-label={
+                              role.status
+                                ? 'Deactivate role'
+                                : 'Activate role'
+                            }
+                            onChange={() =>
+                              toggleRoleStatus(
+                                role.id,
+                                role.status
+                              )
+                            }
+                          />
+                          <span className="role-slider" />
+                        </label>
+                      </div>
+                    </td>
+
+                    <td>
+                      <button
+                        className="edit-btn"
+                        onClick={() => handleEdit(role)}
+                      >
+                        <MdEdit />
+
+                      </button>
+                    </td>
+
+                  </tr>
+                ))
+              )}
+
+
+            </tbody>
+          </table>
+
+          <div className="role-pagination">
             <div className="pagination-info">
-            Showing {currentRoles.length} of {filteredRoles.length}
+              Showing {currentRoles.length} of {filteredRoles.length}
             </div>
 
             <div className="pagination-controls">
-            <button
-              className="pagination-btn"
-              disabled={currentPage === 1}
-              onClick={() =>
-              setCurrentPage((prev) => prev - 1)
-            }
-            >
-            &#8249;
-            </button>
+              <button
+                className="pagination-btn"
+                disabled={currentPage === 1}
+                onClick={() =>
+                  setCurrentPage((prev) => prev - 1)
+                }
+              >
+                &#8249;
+              </button>
 
-            <span className="pagination-text">
-              Page {currentPage} of {totalPages}
-            </span>
+              <span className="pagination-text">
+                Page {currentPage} of {totalPages}
+              </span>
 
-            <button
-            className="pagination-btn"
-            disabled={currentPage === totalPages}
-            onClick={() =>
-            setCurrentPage((prev) => prev + 1)
-            }
-            >
-            &#8250;
-            </button>
-            </div>
-        </div>
-
-      </div>
-
-      {/* Modal */}
-      {modalOpen && (
-        <div className="act-modal-overlay" onClick={closeModal}>
-          <div
-            className="act-modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="act-modal-header">
-              <h2>
-              {editingRoleId ? 'Edit Role' : 'New Role'}
-</h2>
-
-              <button className="act-modal-close" onClick={closeModal}>
-                &times;
+              <button
+                className="pagination-btn"
+                disabled={currentPage === totalPages}
+                onClick={() =>
+                  setCurrentPage((prev) => prev + 1)
+                }
+              >
+                &#8250;
               </button>
             </div>
+          </div>
 
-            <form className="act-modal-form" onSubmit={handleSubmit}>
-              {/* Row 1 */}
-              <div className="act-form-row">
-                
+        </div>
 
-                <label className="act-form-field">
-                  <span>Role Name *</span>
-                  <input
-                    type="text"
-                    value={form.name}
-                    onChange={(e) =>
-                      setForm((c) => ({ ...c, name: e.target.value }))
-                    }
-                    placeholder="e.g. HR Admin"
-                  />
-                </label>
+        {/* Modal */}
+        {modalOpen && (
+          <div className="act-modal-overlay" onClick={closeModal}>
+            <div
+              className="act-modal modal-md"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="act-modal-header">
+                <h2>
+                  {editingRoleId ? 'Edit Role' : 'New Role'}
+                </h2>
+
+                <button className="act-modal-close" onClick={closeModal}>
+                  &times;
+                </button>
               </div>
 
-              {/* Row 2 */}
-              <div className="act-form-row">
-              
+              <form className="act-modal-form" onSubmit={handleSubmit}>
+                {/* Row 1 */}
+                <div className="act-form-row">
 
-                {/* Activity Multi Select */}
-                {/*<label className="act-form-field">
+
+                  <label className="act-form-field ">
+                    <span>Role Name *</span>
+                    <input
+                      type="text"
+                      value={form.name}
+                      onChange={(e) =>
+                        setForm((c) => ({ ...c, name: e.target.value }))
+                      }
+                      placeholder="e.g. HR Admin"
+                    />
+                  </label>
+
+                  <label className="act-form-field">
+                    <span>Activity *</span>
+                    <Select
+                      isMulti
+                      isClearable={false}
+                      closeMenuOnSelect={false}
+                      hideSelectedOptions={false}
+
+                      classNamePrefix="act-select"
+                      options={activityOptions}
+                      placeholder="Select Activities"
+
+                      menuPortalTarget={document.body}
+                      menuPosition="fixed"
+
+                      value={activityOptions.filter((option) =>
+                        form.activityIds.includes(option.value)
+                      )}
+
+                      onChange={(selected) =>
+                        setForm((c) => ({
+                          ...c,
+                          activityIds: selected.map((s) => s.value),
+                        }))
+                      }
+
+                      components={{
+                        MultiValue: (props) => {
+                          const index = props.index
+                          const selectedValues = props.getValue()
+
+                          // show only first 2 chips
+                          if (index < 2) {
+                            return (
+                              <components.MultiValue {...props}>
+                                {props.children}
+                              </components.MultiValue>
+                            )
+                          }
+
+                          // show only ONE overflow badge
+                          if (index === 2) {
+                            return (
+                              <div className="act-select-more">
+                                +{selectedValues.length - 2} more
+                              </div>
+                            )
+                          }
+
+                          return null
+                        },
+                      }}
+                    />
+
+
+                  </label>
+                </div>
+
+                {/* Row 2 */}
+                <div className="act-form-row">
+
+
+                  {/* Activity Multi Select */}
+                  {/*<label className="act-form-field">
                   <span>Activity *</span>
 
                   <select
@@ -608,60 +692,35 @@ async function handleSubmit(
                   </select>
                 </label>
               </div>*/}
-              </div>
 
-              {/* Row 2 */}
-<div className="act-form-row">
-  <label className="act-form-field">
-    <span>Description *</span>
-    <textarea
-      rows={2}
-      value={form.description}
-      onChange={(e) =>
-        setForm((c) => ({
-          ...c,
-          description: e.target.value,
-        }))
-      }
-      placeholder="Enter role description"
-    />
-  </label>
 
-  <label className="act-form-field">
-    <span>Activity *</span>
-    <div ref={activityRef} className="activity-wrapper">
-      <div
-        className="multi-select-box"
-        onClick={() => setActivityDropdownOpen((prev) => !prev)}
-      >
-        {form.activityIds.length > 0
-          ? activities
-  .filter((a) => form.activityIds.includes(a.id))
-  .map((a) => a.activityName)
-  .join(', ')
-          : 'Select Activities'}
-      </div>
+                </div>
 
-      {activityDropdownOpen && (
-        <div className="multi-select-dropdown">
-          {activities.map((activity) => (
-            <label key={activity.id} className="multi-select-item">
-              <input
-                type="checkbox"
-                checked={form.activityIds.includes(activity.id)}
-                onChange={() => toggleActivity(activity.id)}
-              />
-              <span>{activity.activityName}</span>
-            </label>
-          ))}
-        </div>
-      )}
-    </div>
-  </label>
-</div>
+                {/* Row 2 */}
+                <div className="act-form-row">
+                  <label className="act-form-field">
+                    <span>Description *</span>
+                    <textarea
+                      rows={4}
+                      value={form.description}
+                      onChange={(e) =>
+                        setForm((c) => ({
+                          ...c,
+                          description: e.target.value,
+                        }))
+                      }
+                      placeholder="Enter role description"
+                    />
+                  </label>
 
-              {/* Error */}
-              {error && <div className="form-error">{error}</div>}
+
+                </div>
+
+                {/* Error */}
+                {error && <div className="form-error">{error}</div>}
+
+
+              </form>
 
               {/* Actions */}
               <div className="act-modal-actions">
@@ -677,11 +736,10 @@ async function handleSubmit(
                   {editingRoleId ? 'Update Role' : 'Create Role'}
                 </button>
               </div>
-            </form>
+            </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
     </Layout>
   )
 }
