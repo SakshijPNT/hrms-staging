@@ -2,6 +2,9 @@ import { useEffect, useState, type FormEvent } from 'react'
 import Layout from '../pages/Layout'
 import api from '../services/api'
 import '../styles/Style.css'
+import { MdEdit } from "react-icons/md";
+import { FiSearch, FiPlus } from 'react-icons/fi'
+import Select, { components } from 'react-select'
 
 interface PolicyItem {
   id: number
@@ -32,6 +35,8 @@ export function PolicyPage() {
   const [error, setError] =
     useState('')
 
+    const [search, setSearch] = useState('')
+
   const [form, setForm] = useState({
     companyId: '',
     workHours: 8,
@@ -42,6 +47,30 @@ export function PolicyPage() {
     shiftStart: '09:00',
     shiftEnd: '17:00'
   })
+
+  const [currentPage, setCurrentPage] =
+    useState(1)
+
+  const policiesPerPage = 5
+
+  const indexOfLastPolicy =
+    currentPage * policiesPerPage
+
+  const indexOfFirstPolicy =
+    indexOfLastPolicy - policiesPerPage
+
+  const currentPolicies =
+    policies.slice(
+      indexOfFirstPolicy,
+      indexOfLastPolicy
+    )
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(
+      policies.length / policiesPerPage
+    )
+  )
 
   async function fetchAccess() {
 
@@ -77,18 +106,32 @@ export function PolicyPage() {
     }
   }
 
- useEffect(() => {
+  useEffect(() => {
 
-  async function loadData() {
+    async function loadData() {
 
-    await fetchAccess()
+      await fetchAccess()
 
-    await fetchPolicies()
-  }
+      await fetchPolicies()
+    }
 
-  loadData()
+    loadData()
 
-}, [])
+  }, [])
+
+  useEffect(() => {
+
+    if (modalOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = 'auto'
+    }
+
+    return () => {
+      document.body.style.overflow = 'auto'
+    }
+
+  }, [modalOpen])
 
   function openModal() {
 
@@ -216,45 +259,50 @@ export function PolicyPage() {
 
     } catch (error: unknown) {
 
-  const axiosError = error as {response?: {data?: {message?: string}
+      const axiosError = error as {
+        response?: {
+          data?: { message?: string }
+        }
+      }
+
+      setError(
+        axiosError.response?.data?.message ||
+        'Failed to save policy'
+      )
     }
   }
 
-  setError(
-    axiosError.response?.data?.message ||
-    'Failed to save policy'
-  )
-}
-  }
+
 
   return (
 
     <Layout title="Policy Management">
-
       <div className="act-page">
 
-        <div className="act-page-header">
+<div className="act-toolbar">
 
-          <div>
+  <div className="act-search-wrapper">
+    <FiSearch className="act-search-icon" />
 
-            <h1 className="act-title">
-              Policies
-            </h1>
+    <input
+      className="act-search"
+      type="text"
+      placeholder="Search policy"
+      value={search}
+      onChange={(e) => setSearch(e.target.value)}
+    />
+  </div>
 
-          </div>
+  {hasPolicyAccess && (
+    <button
+      className="act-new-btn"
+      onClick={openModal}
+    >
+      <FiPlus /> Policy
+    </button>
+  )}
 
-          {hasPolicyAccess && (
-
-            <button
-              className="act-new-btn"
-              onClick={openModal}
-            >
-              + Policy
-            </button>
-
-          )}
-
-        </div>
+</div>
 
         <div className="act-table-wrapper">
 
@@ -263,13 +311,13 @@ export function PolicyPage() {
             <thead>
 
               <tr>
-                <th>ID</th>     
+                <th>ID</th>
                 <th>Company</th>
                 <th>Work Hours</th>
                 <th>Half Day</th>
                 <th>Shift</th>
                 {hasPolicyAccess && (
-                <th>Action</th>
+                  <th>Action</th>
                 )}
               </tr>
 
@@ -277,46 +325,104 @@ export function PolicyPage() {
 
             <tbody>
 
-              {policies.map((policy) => (
+              {policies.length === 0 ? (
 
-                <tr key={policy.id}>
-
-                  <td>{policy.id}</td>
-
-                  <td>{policy.companyId}</td>
-
-                  <td>{policy.workHours}</td>
-
-                  <td>
-                    {policy.halfdayThreshold}
+                <tr>
+                  <td
+                    colSpan={6}
+                    className="act-empty"
+                  >
+                    No policies found.
                   </td>
-
-                  <td>
-                    {policy.shiftStart}
-                    {' - '}
-                    {policy.shiftEnd}
-                  </td>
-
-      {hasPolicyAccess && (
-  <td>
-    <button
-      className="act-edit-btn"
-      onClick={() =>
-        handleEdit(policy)
-      }
-    >
-      Edit
-    </button>
-  </td>
-)}
-
                 </tr>
 
-              ))}
+              ) : (
+
+                currentPolicies.map((policy) => (
+
+                  <tr key={policy.id}>
+
+                    <td>{policy.id}</td>
+
+                    <td>{policy.companyId}</td>
+
+                    <td>{policy.workHours}</td>
+
+                    <td>
+                      {policy.halfdayThreshold}
+                    </td>
+
+                    <td>
+                      {policy.shiftStart}
+                      {' - '}
+                      {policy.shiftEnd}
+                    </td>
+
+
+
+                    {hasPolicyAccess && (
+                      <td>
+                        <button
+                          className="edit-btn"
+                          onClick={() =>
+                            handleEdit(policy)
+                          }
+                        >
+                          <MdEdit />
+                        </button>
+                      </td>
+                    )}
+
+                  </tr>
+
+                ))
+              )}
 
             </tbody>
 
           </table>
+
+          <div className="role-pagination">
+
+            <div className="pagination-info">
+              Showing {currentPolicies.length} of {' '}{policies.length}
+            </div>
+
+            <div className="pagination-controls">
+
+              <button
+                className="pagination-btn"
+                disabled={currentPage === 1}
+                onClick={() =>
+                  setCurrentPage(
+                    (prev) => prev - 1
+                  )
+                }
+              >
+                &#8249;
+              </button>
+
+              <span className="pagination-text">
+                Page {currentPage} of {totalPages}
+              </span>
+
+              <button
+                className="pagination-btn"
+                disabled={
+                  currentPage === totalPages
+                }
+                onClick={() =>
+                  setCurrentPage(
+                    (prev) => prev + 1
+                  )
+                }
+              >
+                &#8250;
+              </button>
+
+            </div>
+
+          </div>
 
         </div>
 
@@ -548,28 +654,28 @@ export function PolicyPage() {
 
                 )}
 
-                <div className="act-modal-actions">
-
-                  <button
-                    type="button"
-                    className="act-cancel-btn"
-                    onClick={closeModal}
-                  >
-                    Cancel
-                  </button>
-
-                  <button
-                    type="submit"
-                    className="act-submit-btn"
-                  >
-                    {editingPolicyId
-                      ? 'Update Policy'
-                      : 'Create Policy'}
-                  </button>
-
-                </div>
-
               </form>
+
+              <div className="act-modal-actions">
+
+                <button
+                  type="button"
+                  className="act-cancel-btn"
+                  onClick={closeModal}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  className="act-submit-btn"
+                >
+                  {editingPolicyId
+                    ? 'Update Policy'
+                    : 'Create Policy'}
+                </button>
+
+              </div>
 
             </div>
 

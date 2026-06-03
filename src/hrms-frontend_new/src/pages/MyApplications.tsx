@@ -3,6 +3,11 @@ import '../styles/Style.css'
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import api from '../services/api'
 import type { AxiosError } from 'axios'
+import { FiSearch, FiPlus } from 'react-icons/fi'
+import Select from 'react-select'
+import DatePicker from 'react-datepicker'
+import 'react-datepicker/dist/react-datepicker.css'
+import { FiCalendar } from 'react-icons/fi'
 
 interface LeaveBalance {
   leaveTypeId: number
@@ -55,11 +60,31 @@ export function MyApplicationsPage() {
     reason: '',
   })
 
+  const [currentPage, setCurrentPage] = useState(1)
+
   useEffect(() => {
     fetchLeaveBalances()
     fetchApplications()
     fetchLeaveTypes()
   }, [])
+
+    useEffect(() => {
+
+    if (modalOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = 'auto'
+    }
+
+    return () => {
+      document.body.style.overflow = 'auto'
+    }
+
+  }, [modalOpen])
+
+  const [isFromDateOpen, setIsFromDateOpen] = useState(false)
+
+  const [isToDateOpen, setIsToDateOpen] = useState(false)
 
   async function fetchLeaveBalances() {
 
@@ -156,6 +181,29 @@ export function MyApplicationsPage() {
 
   }, [applications, search])
 
+  const applicationsPerPage = 5
+
+  const indexOfLastApplication =
+    currentPage * applicationsPerPage
+
+  const indexOfFirstApplication =
+    indexOfLastApplication - applicationsPerPage
+
+  const currentApplications =
+    filteredApplications.slice(
+      indexOfFirstApplication,
+      indexOfLastApplication
+    )
+
+  const totalPages = Math.ceil(
+    filteredApplications.length / applicationsPerPage
+  )
+
+  const leaveTypeOptions = leaveTypes.map((leave) => ({
+    value: leave.id,
+    label: leave.leaveTypeName,
+  }))
+
   async function handleSubmit(
     event: FormEvent<HTMLFormElement>
   ) {
@@ -222,12 +270,12 @@ export function MyApplicationsPage() {
 
       const axiosError = error as AxiosError<{ message?: string }>
 
-     console.error(axiosError)
+      console.error(axiosError)
 
-    setError(
-    axiosError.response?.data?.message ||
-    'Failed to apply leave'
-    )
+      setError(
+        axiosError.response?.data?.message ||
+        'Failed to apply leave'
+      )
 
 
     } finally {
@@ -242,36 +290,14 @@ export function MyApplicationsPage() {
 
       <div className="act-page">
 
-        {/* HEADER */}
-        <div className="act-page-header">
-
-          <div>
-
-            <nav className="act-breadcrumb">
-
-              <span className="act-breadcrumb-link">
-                Applications
-              </span>
-
-            </nav>
-
-            <h1 className="act-title">
-              My Applications
-            </h1>
-
-          </div>
-
-          <button
-            className="act-new-btn"
-            onClick={openModal}
-          >
-            + New Application
-          </button>
-
-        </div>
-
         {/* LEAVE BALANCE */}
+
+
+        <div className="act-section-header">
+          <h3>Leave Balances</h3>
+        </div>
         <div className="act-stats">
+
 
           {leaveBalances.map((leave) => (
 
@@ -279,6 +305,9 @@ export function MyApplicationsPage() {
               key={leave.leaveTypeId}
               className="act-card"
             >
+              {/* <span className="act-card-label">
+    Available Balance
+  </span> */}
 
               <h3>
                 {leave.leaveTypeName}
@@ -286,6 +315,7 @@ export function MyApplicationsPage() {
 
               <p>
                 {leave.availableBalance}
+                <span> Days</span>
               </p>
 
             </div>
@@ -295,7 +325,7 @@ export function MyApplicationsPage() {
         </div>
 
         {/* SEARCH */}
-        <div className="act-toolbar">
+        {/* <div className="act-toolbar">
 
           <input
             className="act-search"
@@ -306,6 +336,37 @@ export function MyApplicationsPage() {
               setSearch(e.target.value)
             }
           />
+
+        </div> */}
+
+
+        <div className="act-toolbar">
+
+          {/* HEADER */}
+
+          <div className="act-search-wrapper">
+            <FiSearch className="act-search-icon" />
+
+            <input
+              className="act-search"
+              type="text"
+              placeholder="Search applications"
+              value={search}
+              onChange={(e) =>
+                setSearch(e.target.value)
+              }
+            />
+
+
+          </div>
+
+          <button
+            className="act-new-btn"
+            onClick={openModal}
+          >
+            <FiPlus />
+            New Application
+          </button>
 
         </div>
 
@@ -353,7 +414,7 @@ export function MyApplicationsPage() {
 
               ) : (
 
-                filteredApplications.map((app) => (
+                currentApplications.map((app) => (
 
                   <tr key={app.id}>
 
@@ -407,6 +468,42 @@ export function MyApplicationsPage() {
 
           </table>
 
+          <div className="role-pagination">
+
+            <div className="pagination-info">
+              Showing {currentApplications.length} of {filteredApplications.length}
+            </div>
+
+            <div className="pagination-controls">
+
+              <button
+                className="pagination-btn"
+                disabled={currentPage === 1}
+                onClick={() =>
+                  setCurrentPage((prev) => prev - 1)
+                }
+              >
+                &#8249;
+              </button>
+
+              <span className="pagination-text">
+                Page {currentPage} of {totalPages}
+              </span>
+
+              <button
+                className="pagination-btn"
+                disabled={currentPage === totalPages}
+                onClick={() =>
+                  setCurrentPage((prev) => prev + 1)
+                }
+              >
+                &#8250;
+              </button>
+
+            </div>
+
+          </div>
+
         </div>
 
         {/* MODAL */}
@@ -456,7 +553,7 @@ export function MyApplicationsPage() {
                       Leave Type *
                     </span>
 
-                    <select
+                    {/* <select
                       value={form.leaveTypeId}
                       onChange={(e) =>
                         setForm((c) => ({
@@ -483,7 +580,31 @@ export function MyApplicationsPage() {
 
                       ))}
 
-                    </select>
+                    </select> */}
+
+                    <Select
+                      menuPortalTarget={document.body}
+                      menuPosition="fixed"
+                      menuPlacement="auto"
+                      menuShouldScrollIntoView={false}
+                      classNamePrefix="act-select"
+                      options={leaveTypeOptions}
+                      placeholder="Select Leave Type"
+                      value={
+                        leaveTypeOptions.find(
+                          (option) =>
+                            String(option.value) === form.leaveTypeId
+                        ) || null
+                      }
+                      onChange={(selected) =>
+                        setForm((c) => ({
+                          ...c,
+                          leaveTypeId: selected
+                            ? String(selected.value)
+                            : '',
+                        }))
+                      }
+                    />
 
                   </label>
 
@@ -546,7 +667,7 @@ export function MyApplicationsPage() {
                 <div className="act-form-row">
 
                   {/* FROM DATE */}
-                  <label className="act-form-field">
+                  {/* <label className="act-form-field">
 
                     <span>
                       From Date *
@@ -568,10 +689,65 @@ export function MyApplicationsPage() {
                       }
                     />
 
+                  </label> */}
+                  <label className="act-form-field">
+                    <span>
+                      From Date *
+                    </span>
+
+                    <div className="act-date-picker-wrapper">
+
+
+                      <DatePicker
+                        selected={
+                          form.fromDate
+                            ? new Date(form.fromDate)
+                            : null
+                        }
+                        onChange={(date: Date | null) => {
+
+                          const formattedDate =
+                            date
+                              ? date.toISOString().split('T')[0]
+                              : ''
+
+                          setForm((c) => ({
+                            ...c,
+                            fromDate: formattedDate,
+                            toDate: c.isHalfDay
+                              ? formattedDate
+                              : c.toDate,
+                          }))
+
+                          setIsFromDateOpen(false)
+                        }}
+                        onInputClick={() =>
+                          setIsFromDateOpen(true)
+                        }
+                        open={isFromDateOpen}
+                        onClickOutside={() =>
+                          setIsFromDateOpen(false)
+                        }
+                        placeholderText="Select from date"
+                        dateFormat="dd MMM yyyy"
+                        className="act-date-picker"
+                        popperClassName="act-datepicker-popper"
+                        portalId="root"
+                        popperPlacement="bottom-start"
+                      />
+
+                      <FiCalendar
+                        className="act-date-icon"
+                        onClick={() =>
+                          setIsFromDateOpen((prev) => !prev)
+                        }
+                      />
+
+                    </div>
                   </label>
 
                   {/* TO DATE */}
-                  <label className="act-form-field">
+                  {/* <label className="act-form-field">
 
                     <span>
                       To Date *
@@ -593,8 +769,59 @@ export function MyApplicationsPage() {
                       }
                     />
 
-                  </label>
+                  </label> */}
+                  <label className="act-form-field">
 
+                    <span>
+                      To Date *
+                    </span>
+
+                    <div className="act-date-picker-wrapper">
+                      <DatePicker
+                        selected={
+                          form.toDate
+                            ? new Date(form.toDate)
+                            : null
+                        }
+                        onChange={(date: Date | null) => {
+
+                          setForm((c) => ({
+                            ...c,
+                            toDate: date
+                              ? date.toISOString().split('T')[0]
+                              : '',
+                          }))
+
+                          setIsToDateOpen(false)
+                        }}
+                        onInputClick={() =>
+                          setIsToDateOpen(true)
+                        }
+                        open={isToDateOpen}
+                        onClickOutside={() =>
+                          setIsToDateOpen(false)
+                        }
+                        placeholderText="Select to date"
+                        dateFormat="dd MMM yyyy"
+                        className="act-date-picker"
+                        popperClassName="act-datepicker-popper"
+                        portalId="root"
+                        popperPlacement="bottom-start"
+                        disabled={form.isHalfDay}
+                      />
+
+                      <FiCalendar
+                        className={`act-date-icon ${form.isHalfDay ? 'disabled-date-icon' : ''
+                          }`}
+                        onClick={() => {
+                          if (!form.isHalfDay) {
+                            setIsToDateOpen((prev) => !prev)
+                          }
+                        }}
+                      />
+
+                    </div>
+                  </label>
                 </div>
 
                 {/* SESSION */}
@@ -608,7 +835,7 @@ export function MyApplicationsPage() {
                         Session *
                       </span>
 
-                      <select
+                      {/* <select
                         value={form.session}
                         onChange={(e) =>
                           setForm((c) => ({
@@ -630,7 +857,45 @@ export function MyApplicationsPage() {
                           Second Half
                         </option>
 
-                      </select>
+                      </select> */}
+
+                      <Select
+                        menuPortalTarget={document.body}
+                        menuPosition="fixed"
+                        menuPlacement="auto"
+                        menuShouldScrollIntoView={false}
+                        classNamePrefix="act-select"
+                        placeholder="Select Session"
+                        options={[
+                          {
+                            value: 'FIRST_HALF',
+                            label: 'First Half',
+                          },
+                          {
+                            value: 'SECOND_HALF',
+                            label: 'Second Half',
+                          },
+                        ]}
+                        value={
+                          form.session
+                            ? {
+                              value: form.session,
+                              label:
+                                form.session === 'FIRST_HALF'
+                                  ? 'First Half'
+                                  : 'Second Half',
+                            }
+                            : null
+                        }
+                        onChange={(selected) =>
+                          setForm((c) => ({
+                            ...c,
+                            session: selected
+                              ? selected.value
+                              : '',
+                          }))
+                        }
+                      />
 
                     </label>
 
@@ -696,32 +961,33 @@ export function MyApplicationsPage() {
 
                 )}
 
-                {/* ACTIONS */}
-                <div className="act-modal-actions">
-
-                  <button
-                    type="button"
-                    className="act-cancel-btn"
-                    onClick={closeModal}
-                  >
-                    Cancel
-                  </button>
-
-                  <button
-                    type="submit"
-                    className="act-submit-btn"
-                    disabled={loading}
-                  >
-
-                    {loading
-                      ? 'Applying...'
-                      : 'Apply Leave'}
-
-                  </button>
-
-                </div>
 
               </form>
+
+              {/* ACTIONS */}
+              <div className="act-modal-actions">
+
+                <button
+                  type="button"
+                  className="act-cancel-btn"
+                  onClick={closeModal}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  className="act-submit-btn"
+                  disabled={loading}
+                >
+
+                  {loading
+                    ? 'Applying...'
+                    : 'Apply Leave'}
+
+                </button>
+
+              </div>
 
             </div>
 
