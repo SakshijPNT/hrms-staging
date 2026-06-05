@@ -11,6 +11,8 @@ import { RolesPage } from './pages/Roles'
 import { UsersPage } from './pages/Users'
 import { MyApplicationsPage } from './pages/MyApplications'
 import { RegularizationApprovalsPage } from './pages/RegularizationApprovals'
+import { MyLeavesPage } from './pages/MyLeaves'
+import { MyApprovalPage } from './pages/MyApproval'
 import { CompanyPage } from './pages/Company'
 import { PolicyPage } from './pages/Policy'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -80,6 +82,17 @@ function App() {
           }
         />
 
+        <Route
+          path="/my-leaves"
+          element={<MyLeavesPage />}
+        />
+
+        <Route
+          path="/my-approval"
+          element={<MyApprovalPage />}
+        />
+
+        {/* Company */}
         <Route
           path="/company-configuration"
           element={

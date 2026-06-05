@@ -10,6 +10,8 @@ import {
 import {
   HiOutlineUsers,
   HiOutlineBuildingOffice2,
+  HiOutlineCalendarDays,
+  HiOutlineClipboardDocumentCheck,
 } from 'react-icons/hi2'
 
 import {
@@ -101,6 +103,22 @@ const moduleRoutes: Record<
     ),
   },
 
+  'My Leaves': {
+    path: '/my-leaves',
+    label: 'My Leaves',
+    icon: (
+      <HiOutlineCalendarDays className="menu-icon" />
+    ),
+  },
+
+  'My Approval': {
+    path: '/my-approval',
+    label: 'My Approval',
+    icon: (
+      <HiOutlineClipboardDocumentCheck className="menu-icon" />
+    ),
+  },
+
   Settings: {
     path: '/settings',
     label: 'Settings',
@@ -126,7 +144,108 @@ const moduleRoutes: Record<
   },
 }
 
+const SIDEBAR_MODULE_ORDER: Record<string, number> = {
+  Dashboard: 0,
+  Users: 1,
+  Roles: 2,
+  'My Leaves': 3,
+  'My Approval': 4,
+  'My Applications': 5,
+  'My Team': 6,
+  Settings: 100,
+}
 
+const FRONTEND_ONLY_MODULES: ModuleGroup[] = [
+  {
+    groupId: 999901,
+    groupName: 'My Leaves',
+    modules: [
+      {
+        id: 999901,
+        moduleName: 'My Leaves',
+        description: 'My Leaves',
+        iconUrl: null,
+      },
+    ],
+  },
+  {
+    groupId: 999902,
+    groupName: 'My Approval',
+    modules: [
+      {
+        id: 999902,
+        moduleName: 'My Approval',
+        description: 'My Approval',
+        iconUrl: null,
+      },
+    ],
+  },
+]
+
+function enhanceSidebarGroups(
+  groups: ModuleGroup[]
+): ModuleGroup[] {
+  const existingModuleNames = new Set(
+    groups.flatMap((group) =>
+      group.modules.map(
+        (module) => module.moduleName
+      )
+    )
+  )
+
+  const modulesToAdd =
+    FRONTEND_ONLY_MODULES.filter(
+      (group) =>
+        !existingModuleNames.has(
+          group.modules[0].moduleName
+        )
+    )
+
+  if (modulesToAdd.length === 0) {
+    return groups
+  }
+
+  return [...groups, ...modulesToAdd]
+}
+
+function sortSidebarGroups(
+  groups: ModuleGroup[]
+): ModuleGroup[] {
+  const getOrder = (group: ModuleGroup): number => {
+    if (group.groupName === 'Settings') {
+      return SIDEBAR_MODULE_ORDER.Settings
+    }
+
+    if (group.modules.length === 1) {
+      const moduleName =
+        group.modules[0].moduleName
+
+      if (moduleName in SIDEBAR_MODULE_ORDER) {
+        return SIDEBAR_MODULE_ORDER[moduleName]
+      }
+    }
+
+    return 50
+  }
+
+  return [...groups].sort((a, b) => {
+    const orderDiff = getOrder(a) - getOrder(b)
+
+    if (orderDiff !== 0) {
+      return orderDiff
+    }
+
+    return groups.indexOf(a) - groups.indexOf(b)
+  })
+}
+
+function getSidebarGroups(
+  groups: ModuleGroup[]
+): ModuleGroup[] {
+  return sortSidebarGroups(
+    enhanceSidebarGroups(groups)
+  )
+}
 
 export default function Sidebar({
 
@@ -179,7 +298,7 @@ export default function Sidebar({
         {/* MENU */}
         <nav className="sidebar-menu">
 
-          {groups.map((group) => {
+          {getSidebarGroups(groups).map((group) => {
 
             const hasChildren =
               group.modules.length > 1
