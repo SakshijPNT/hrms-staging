@@ -10,6 +10,7 @@ import {
 import {
   HiOutlineUsers,
   HiOutlineBuildingOffice2,
+  HiOutlineCalendarDays,
 } from 'react-icons/hi2'
 
 import {
@@ -97,6 +98,14 @@ const moduleRoutes: Record<
     ),
   },
 
+  'My Leaves': {
+    path: '/my-leaves',
+    label: 'My Leaves',
+    icon: (
+      <HiOutlineCalendarDays className="menu-icon" />
+    ),
+  },
+
   Settings: {
     path: '/settings',
     label: 'Settings',
@@ -122,22 +131,64 @@ const moduleRoutes: Record<
   },
 }
 
+const SIDEBAR_MODULE_ORDER: Record<string, number> = {
+  Dashboard: 0,
+  Users: 1,
+  Roles: 2,
+  'My Leaves': 3,
+  'My Applications': 4,
+  'My Team': 5,
+  Settings: 100,
+}
+
+const MY_LEAVES_GROUP: ModuleGroup = {
+  groupId: 999901,
+  groupName: 'My Leaves',
+  modules: [
+    {
+      id: 999901,
+      moduleName: 'My Leaves',
+      description: 'My Leaves',
+      iconUrl: null,
+    },
+  ],
+}
+
+function enhanceSidebarGroups(
+  groups: ModuleGroup[]
+): ModuleGroup[] {
+  const hasMyLeaves = groups.some((group) =>
+    group.modules.some(
+      (module) =>
+        module.moduleName === 'My Leaves'
+    )
+  )
+
+  if (hasMyLeaves) {
+    return groups
+  }
+
+  return [...groups, MY_LEAVES_GROUP]
+}
+
 function sortSidebarGroups(
   groups: ModuleGroup[]
 ): ModuleGroup[] {
   const getOrder = (group: ModuleGroup): number => {
     if (group.groupName === 'Settings') {
-      return Number.MAX_SAFE_INTEGER
+      return SIDEBAR_MODULE_ORDER.Settings
     }
 
-    if (
-      group.modules.length === 1 &&
-      group.modules[0].moduleName === 'Dashboard'
-    ) {
-      return 0
+    if (group.modules.length === 1) {
+      const moduleName =
+        group.modules[0].moduleName
+
+      if (moduleName in SIDEBAR_MODULE_ORDER) {
+        return SIDEBAR_MODULE_ORDER[moduleName]
+      }
     }
 
-    return 1
+    return 50
   }
 
   return [...groups].sort((a, b) => {
@@ -149,6 +200,14 @@ function sortSidebarGroups(
 
     return groups.indexOf(a) - groups.indexOf(b)
   })
+}
+
+function getSidebarGroups(
+  groups: ModuleGroup[]
+): ModuleGroup[] {
+  return sortSidebarGroups(
+    enhanceSidebarGroups(groups)
+  )
 }
 
 export default function Sidebar({
@@ -202,7 +261,7 @@ export default function Sidebar({
         {/* MENU */}
         <nav className="sidebar-menu">
 
-          {sortSidebarGroups(groups).map((group) => {
+          {getSidebarGroups(groups).map((group) => {
 
             const hasChildren =
               group.modules.length > 1

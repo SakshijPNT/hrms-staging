@@ -10,6 +10,7 @@ import Dashboard from './pages/Dashboard'
 import { RolesPage } from './pages/Roles'
 import { UsersPage } from './pages/Users'
 import { MyApplicationsPage } from './pages/MyApplications'
+import { MyLeavesPage } from './pages/MyLeaves'
 import { CompanyPage } from './pages/Company'
 import  { PolicyPage } from './pages/Policy'
 
@@ -53,6 +54,11 @@ function App() {
         <Route
         path="/my-applications"
         element={<MyApplicationsPage />}
+        />
+
+        <Route
+          path="/my-leaves"
+          element={<MyLeavesPage />}
         />
 
         {/* Company */}

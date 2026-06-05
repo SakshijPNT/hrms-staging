@@ -54,6 +54,75 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* =========================
+   TEXT SELECTION / CARET
+   Show caret only in editable fields
+========================= */
+
+button,
+.act-form-field > span,
+.act-form-section-title,
+.act-modal-header h2,
+.pagination-info,
+.pagination-text,
+.attendance-card,
+.attendance-table-section,
+.leaves-stats,
+.act-leave-card,
+.act-table-wrapper:has(.leaves-table),
+.leaves-table td,
+.leave-status-text,
+.footer-label,
+.footer-value,
+.status-label,
+.status-value,
+.attendance-date,
+.attendance-time,
+.attendance-current-status,
+.attendance-month-label,
+.menu-item,
+.menu-parent span,
+.submenu-item,
+.act-card h3,
+.act-card p,
+.act-leave-card-content,
+.role-pagination {
+  user-select: none;
+  cursor: default;
+}
+
+button,
+.menu-item,
+.check-btn,
+.act-new-btn,
+.act-submit-btn,
+.act-cancel-btn,
+.pagination-btn,
+.attendance-action-btn,
+.leave-table-action-btn,
+.attendance-month-btn,
+.edit-btn,
+.act-modal-close,
+.halfday-radio {
+  cursor: pointer;
+  user-select: none;
+}
+
+input:not([type='checkbox']):not([type='radio']):not([readonly]):not(:disabled),
+textarea:not([readonly]):not(:disabled),
+.act-search:not([readonly]):not(:disabled) {
+  user-select: text;
+  cursor: text;
+}
+
+input[readonly],
+input:disabled,
+textarea:disabled,
+.regularization-date-readonly {
+  user-select: none;
+  cursor: default;
+}
+
 .act-form-field input,
 .act-form-field textarea,
 .act-form-field select,
@@ -2872,6 +2941,121 @@ box-shadow:
 .act-status.rejected {
   background: #fee2e2;
   color: #991b1b;
+}
+
+/* my leaves */
+.leaves-stats {
+  margin-bottom: 18px;
+  user-select: none;
+  cursor: default;
+}
+
+.act-leave-card {
+  background: #ffffff;
+  border: 1px solid #eef2f7;
+  border-radius: 14px;
+  padding: 14px 16px;
+  min-height: 76px;
+  user-select: none;
+  cursor: default;
+}
+
+.act-leave-card-content h3 {
+  font-size: 15px;
+  font-weight: 600;
+  color: #475569;
+  margin: 0 0 10px;
+}
+
+.act-leave-card-total {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--secondary);
+}
+
+.act-leave-card-meta {
+  display: flex;
+  gap: 18px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #64748b;
+}
+
+.leaves-toolbar {
+  align-items: center;
+}
+
+.leaves-filters {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.leaves-filter-field {
+  width: 180px;
+  max-width: 100%;
+}
+
+.leaves-table td {
+  font-size: 14px;
+  user-select: none;
+  cursor: default;
+}
+
+.leave-status-text {
+  font-size: 14px;
+  font-weight: 600;
+  user-select: none;
+  cursor: default;
+}
+
+.act-table-wrapper:has(.leaves-table) {
+  user-select: none;
+  cursor: default;
+}
+
+.leaves-table .role-pagination {
+  user-select: none;
+  cursor: default;
+}
+
+.leave-status-text.approve {
+  color: #16a34a;
+}
+
+.leave-status-text.reject {
+  color: #dc2626;
+}
+
+.leave-status-text.pending {
+  color: #d97706;
+}
+
+.table-action-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.leave-table-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 17px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.leave-table-action-btn:hover {
+  background: var(--bg-soft);
+  color: var(--secondary);
 }
 
 .halfday-radio-group {
