@@ -2,9 +2,11 @@ import {
   HiOutlineBars3,
 } from 'react-icons/hi2'
 
+import type { SessionInfo } from '../../types/auth'
+
 interface HeaderProps {
   title: string
-  session: any
+  session: SessionInfo | null
   sidebarOpen: boolean
   setSidebarOpen: React.Dispatch<
     React.SetStateAction<boolean>
@@ -49,25 +51,30 @@ export default function Header({
 
       <div className="profile-box">
 
-        <div className="profile-avatar">
-          SA
-        </div>
+<div className="profile-avatar">
+  {session?.fullName
+    ? session.fullName
+        .split(' ')
+        .map((part: string) => part[0])
+        .join('')
+        .slice(0, 2)
+        .toUpperCase()
+    : '--'}
+</div>
 
-        <div>
+<div>
 
-          <h4>
-            {session.user?.fullName ||
-              'System Admin'}
-          </h4>
+  <h4>
+    {session?.fullName ?? 'Loading...'}
+  </h4>
 
-          <p>
-            {session.user?.emailId ||
-              'admin@hrms.com'}
-          </p>
+  <p>
+    {session?.emailId ?? ''}
+  </p>
 
-        </div>
+</div>
 
-      </div>
+</div>
 
     </header>
   )

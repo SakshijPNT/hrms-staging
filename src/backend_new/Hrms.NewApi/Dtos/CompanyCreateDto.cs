@@ -33,4 +33,6 @@ public class CompanyCreateDto
     public string Timezone { get; set; } = "Asia/Kolkata";
 
     public short StatusCode { get; set; } = 1;
+
+    public IReadOnlyList<HolidayBulkItemDto> Holidays { get; set; } = Array.Empty<HolidayBulkItemDto>();
 }

@@ -3,6 +3,10 @@ import '../styles/Style.css'
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import api from '../services/api'
 import type { AxiosError } from 'axios'
+import type { SessionInfo } from '../../types/auth'
+import type { RegularizationApplication } from '../../types/regularization'
+import RegularizationModal from '../components/RegularizationModal'
+import { formatAttendanceTime, normalizeDate } from '../utils/attendanceFormat'
 import { FiSearch, FiPlus } from 'react-icons/fi'
 import Select from 'react-select'
 import DatePicker from 'react-datepicker'
@@ -37,19 +41,24 @@ interface Application {
 export function MyApplicationsPage() {
 
   const [leaveBalances, setLeaveBalances] = useState<LeaveBalance[]>([])
-
   const [applications, setApplications] = useState<Application[]>([])
-
+  const [regularizations, setRegularizations] = useState<
+    RegularizationApplication[]
+  >([])
   const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([])
-
   const [search, setSearch] = useState('')
-
-  const [modalOpen, setModalOpen] = useState(false)
-
+  const [leaveModalOpen, setLeaveModalOpen] = useState(false)
+  const [regularizationModalOpen, setRegularizationModalOpen] =
+    useState(false)
+    const [currentPage, setCurrentPage] = useState(1)
   const [loading, setLoading] = useState(false)
-
+  const [cancellingId, setCancellingId] = useState<number | null>(null)
   const [error, setError] = useState('')
+  const [session, setSession] = useState<SessionInfo | null>(null)
 
+const timezone = session?.timezone ?? 'Asia/Kolkata'
+const [isFromDateOpen, setIsFromDateOpen] = useState(false)
+const [isToDateOpen, setIsToDateOpen] = useState(false)
   const [form, setForm] = useState({
     leaveTypeId: '',
     fromDate: '',
@@ -60,91 +69,62 @@ export function MyApplicationsPage() {
     reason: '',
   })
 
-  const [currentPage, setCurrentPage] = useState(1)
-
   useEffect(() => {
-    fetchLeaveBalances()
-    fetchApplications()
-    fetchLeaveTypes()
+    void loadSession()
+    void fetchLeaveBalances()
+    void fetchApplications()
+    void fetchLeaveTypes()
+    void fetchRegularizations()
   }, [])
 
-    useEffect(() => {
-
-    if (modalOpen) {
-      document.body.style.overflow = 'hidden'
-    } else {
-      document.body.style.overflow = 'auto'
-    }
-
-    return () => {
-      document.body.style.overflow = 'auto'
-    }
-
-  }, [modalOpen])
-
-  const [isFromDateOpen, setIsFromDateOpen] = useState(false)
-
-  const [isToDateOpen, setIsToDateOpen] = useState(false)
+  async function loadSession() {
+  try {
+    const response = await api.get<SessionInfo>('/auth/session')
+    setSession(response.data)
+  } catch {
+    setSession(null)
+  }
+}
 
   async function fetchLeaveBalances() {
-
     try {
-
-      const response = await api.get(
-        '/user-leaves/balances'
-      )
-
+      const response = await api.get('/user-leaves/balances')
       setLeaveBalances(response.data)
-
-    } catch (error) {
-
-      console.error(
-        'Error fetching leave balances',
-        error
-      )
+    } catch (fetchError) {
+      console.error('Error fetching leave balances', fetchError)
     }
   }
 
   async function fetchApplications() {
-
     try {
-
-      const response = await api.get(
-        '/user-leaves/applications'
-      )
-
+      const response = await api.get('/user-leaves/applications')
       setApplications(response.data)
+    } catch (fetchError) {
+      console.error('Error fetching applications', fetchError)
+    }
+  }
 
-    } catch (error) {
-
-      console.error(
-        'Error fetching applications',
-        error
+  async function fetchRegularizations() {
+    try {
+      const response = await api.get<RegularizationApplication[]>(
+        '/regularization/applications',
       )
+      setRegularizations(response.data)
+    } catch (fetchError) {
+      console.error('Error fetching regularizations', fetchError)
     }
   }
 
   async function fetchLeaveTypes() {
-
     try {
-
-      const response = await api.get(
-        '/user-leaves/leave-types'
-      )
-
+      const response = await api.get('/user-leaves/leave-types')
       setLeaveTypes(response.data)
-
-    } catch (error) {
-
-      console.error(
-        'Error fetching leave types',
-        error
-      )
+    } catch (fetchError) {
+      console.error('Error fetching leave types', fetchError)
     }
   }
 
-  function openModal() {
-
+  function openLeaveModal() {
     setForm({
       leaveTypeId: '',
       fromDate: '',
@@ -154,32 +134,27 @@ export function MyApplicationsPage() {
       workHours: '',
       reason: '',
     })
-
     setError('')
-
-    setModalOpen(true)
+    setLeaveModalOpen(true)
   }
 
-  function closeModal() {
-    setModalOpen(false)
+  function closeLeaveModal() {
+    setLeaveModalOpen(false)
   }
 
   const filteredApplications = useMemo(() => {
-
     const q = search.toLowerCase()
-
     return applications.filter(
       (app) =>
-        app.leaveTypeName
-          .toLowerCase()
-          .includes(q) ||
-
-        app.approvalStatus
-          .toLowerCase()
-          .includes(q)
+        app.leaveTypeName.toLowerCase().includes(q) ||
+        app.approvalStatus.toLowerCase().includes(q),
     )
-
   }, [applications, search])
+
+
+  
+
+
 
   const applicationsPerPage = 5
 
@@ -204,100 +179,115 @@ export function MyApplicationsPage() {
     label: leave.leaveTypeName,
   }))
 
-  async function handleSubmit(
-    event: FormEvent<HTMLFormElement>
-  ) {
+  const filteredRegularizations = useMemo(() => {
+    const q = search.toLowerCase()
+    return regularizations.filter(
+      (item) =>
+        item.reason.toLowerCase().includes(q) ||
+        item.approvalStatus.toLowerCase().includes(q) ||
+        normalizeDate(item.logDate).includes(q),
+    )
+  }, [regularizations, search])
 
+  async function handleLeaveSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    if (
-      !form.leaveTypeId ||
-      !form.fromDate ||
-      !form.reason.trim()
-    ) {
+    if (!form.leaveTypeId || !form.fromDate || !form.reason.trim()) {
       setError('All required fields must be filled.')
       return
     }
 
-    if (
-      form.isHalfDay &&
-      !form.session
-    ) {
-      setError(
-        'Please select session for half day leave.'
-      )
-
+    if (form.isHalfDay && !form.session) {
+      setError('Please select session for half day leave.')
       return
     }
 
     try {
-
       setLoading(true)
 
       const payload = {
-
         leaveTypeId: Number(form.leaveTypeId),
-
         fromDate: form.fromDate,
-
-        toDate: form.isHalfDay
-          ? form.fromDate
-          : form.toDate,
-
+        toDate: form.isHalfDay ? form.fromDate : form.toDate,
         isHalfDay: form.isHalfDay,
-
-        session: form.isHalfDay
-          ? form.session
-          : null,
-
+        session: form.isHalfDay ? form.session : null,
         workHours: form.workHours,
-
         reason: form.reason,
       }
 
-      await api.post(
-        '/user-leaves/applications',
-        payload
-      )
-
+      await api.post('/user-leaves/applications', payload)
       await fetchApplications()
-
       await fetchLeaveBalances()
-
-      closeModal()
-
-    } catch (error: unknown) {
-
-      const axiosError = error as AxiosError<{ message?: string }>
-
-      console.error(axiosError)
-
+      closeLeaveModal()
+    } catch (submitError: unknown) {
+      const axiosError = submitError as AxiosError<{ message?: string }>
       setError(
-        axiosError.response?.data?.message ||
-        'Failed to apply leave'
+        axiosError.response?.data?.message ?? 'Failed to apply leave',
       )
-
-
     } finally {
-
       setLoading(false)
     }
   }
 
+  async function handleCancelRegularization(id: number) {
+    if (!window.confirm('Cancel this regularization request?')) {
+      return
+    }
+
+    setCancellingId(id)
+
+    try {
+      await api.patch(`/regularization/applications/${id}/cancel`)
+      await fetchRegularizations()
+    } catch (cancelError) {
+      const axiosError = cancelError as AxiosError<{ message?: string }>
+      window.alert(
+        axiosError.response?.data?.message ??
+          'Failed to cancel regularization request.',
+      )
+    } finally {
+      setCancellingId(null)
+    }
+  }
+
+  function statusClass(status: string) {
+    return `act-status ${status.toLowerCase()}`
+  }
+
   return (
-
     <Layout title="My Applications">
-
       <div className="act-page">
 
-        {/* LEAVE BALANCE */}
+        {/* HEADER */}
+        <div className="act-page-header">
 
+          <div>
 
-        <div className="act-section-header">
-          <h3>Leave Balances</h3>
+            <nav className="act-breadcrumb">
+
+              <span className="act-breadcrumb-link">
+                Applications
+              </span>
+
+            </nav>
+
+            <h1 className="act-title">
+              My Applications
+            </h1>
+
+          </div>
+
+          <button
+            className="act-new-btn"
+            onClick={openLeaveModal}
+          >
+            + New Application
+          </button>
+
         </div>
-        <div className="act-stats">
 
+        {/* LEAVE BALANCE */}
+        <div className="act-stats">
 
           {leaveBalances.map((leave) => (
 
@@ -305,9 +295,6 @@ export function MyApplicationsPage() {
               key={leave.leaveTypeId}
               className="act-card"
             >
-              {/* <span className="act-card-label">
-    Available Balance
-  </span> */}
 
               <h3>
                 {leave.leaveTypeName}
@@ -315,13 +302,10 @@ export function MyApplicationsPage() {
 
               <p>
                 {leave.availableBalance}
-                <span> Days</span>
               </p>
 
             </div>
-
           ))}
-
         </div>
 
         {/* SEARCH */}
@@ -362,7 +346,7 @@ export function MyApplicationsPage() {
 
           <button
             className="act-new-btn"
-            onClick={openModal}
+            onClick={openLeaveModal}
           >
             <FiPlus />
             New Application
@@ -370,102 +354,52 @@ export function MyApplicationsPage() {
 
         </div>
 
-        {/* APPLICATION TABLE */}
         <div className="act-table-wrapper">
-
           <table className="act-table">
-
             <thead>
-
               <tr>
-
                 <th>ID</th>
-
                 <th>Leave Type</th>
-
                 <th>From</th>
-
                 <th>To</th>
-
                 <th>Total Days</th>
-
                 <th>Session</th>
-
                 <th>Status</th>
-
               </tr>
-
             </thead>
-
             <tbody>
-
               {filteredApplications.length === 0 ? (
-
                 <tr>
-
-                  <td
-                    colSpan={7}
-                    className="act-empty"
-                  >
+                  <td colSpan={7} className="act-empty">
                     No applications found.
                   </td>
-
                 </tr>
-
               ) : (
 
-                currentApplications.map((app) => (
+                filteredApplications.map((app) => (
 
                   <tr key={app.id}>
-
                     <td>{app.id}</td>
-
+                    <td>{app.leaveTypeName}</td>
+                    <td>{app.fromDate}</td>
+                    <td>{app.toDate}</td>
+                    <td>{app.totalDays}</td>
                     <td>
-                      {app.leaveTypeName}
-                    </td>
-
-                    <td>
-                      {app.fromDate}
-                    </td>
-
-                    <td>
-                      {app.toDate}
-                    </td>
-
-                    <td>
-                      {app.totalDays}
-                    </td>
-
-                    <td>
-
                       {app.isHalfDay
                         ? app.session === 'FIRST_HALF'
                           ? 'First Half'
                           : 'Second Half'
                         : '-'}
-
                     </td>
-
                     <td>
-
-                      <span
-                        className={`act-status ${app.approvalStatus.toLowerCase()}`}
-                      >
-
+                      <span className={statusClass(app.approvalStatus)}>
                         {app.approvalStatus}
-
                       </span>
-
                     </td>
-
                   </tr>
-
                 ))
-
               )}
-
             </tbody>
-
           </table>
 
           <div className="role-pagination">
@@ -506,81 +440,129 @@ export function MyApplicationsPage() {
 
         </div>
 
-        {/* MODAL */}
-        {modalOpen && (
+        {regularizations.length > 0 && (
+          <div className="act-section">
+            <div className="act-table-wrapper">
+              <table className="act-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Date</th>
+                    <th>Actual IN</th>
+                    <th>Actual OUT</th>
+                    <th>Requested IN</th>
+                    <th>Requested OUT</th>
+                    <th>Reason</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredRegularizations.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} className="act-empty">
+                        No matching regularization requests.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredRegularizations.map((item) => (
+                      <tr key={item.id}>
+                        <td>{item.id}</td>
+                        <td>{normalizeDate(item.logDate)}</td>
+                        <td>
+                          {formatAttendanceTime(
+                            item.originalCheckInTime,
+                            timezone,
+                          )}
+                        </td>
+                        <td>
+                          {formatAttendanceTime(
+                            item.originalCheckOutTime,
+                            timezone,
+                          )}
+                        </td>
+                        <td>
+                          {formatAttendanceTime(
+                            item.requestedCheckInTime,
+                            timezone,
+                          )}
+                        </td>
+                        <td>
+                          {formatAttendanceTime(
+                            item.requestedCheckOutTime,
+                            timezone,
+                          )}
+                        </td>
+                        <td>{item.reason}</td>
+                        <td>
+                          <span className={statusClass(item.approvalStatus)}>
+                            {item.approvalStatus}
+                          </span>
+                        </td>
+                        <td>
+                          {item.approvalStatus === 'PENDING' ? (
+                            <button
+                              type="button"
+                              className="act-cancel-btn reg-action-btn"
+                              disabled={cancellingId === item.id}
+                              onClick={() =>
+                                void handleCancelRegularization(item.id)
+                              }
+                            >
+                              {cancellingId === item.id
+                                ? 'Cancelling...'
+                                : 'Cancel'}
+                            </button>
+                          ) : (
+                            '-'
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
-          <div
-            className="act-modal-overlay"
-            onClick={closeModal}
-          >
+        <RegularizationModal
+          open={regularizationModalOpen}
+          timezone={timezone}
+          onClose={() => setRegularizationModalOpen(false)}
+          onSuccess={() => {
+            void fetchRegularizations()
+          }}
+        />
 
+        {leaveModalOpen && (
+          <div className="act-modal-overlay" onClick={closeLeaveModal}>
             <div
               className="act-modal"
-              onClick={(e) =>
-                e.stopPropagation()
-              }
+              onClick={(event) => event.stopPropagation()}
             >
-
-              {/* HEADER */}
               <div className="act-modal-header">
-
-                <h2>
-                  Apply Leave
-                </h2>
-
+                <h2>Apply Leave</h2>
                 <button
+                  type="button"
                   className="act-modal-close"
-                  onClick={closeModal}
+                  onClick={closeLeaveModal}
                 >
                   &times;
                 </button>
-
               </div>
 
-              {/* FORM */}
-              <form
-                className="act-modal-form"
-                onSubmit={handleSubmit}
-              >
-
-                {/* ROW 1 */}
+              <form className="act-modal-form" onSubmit={handleLeaveSubmit}>
                 <div className="act-form-row">
-
-                  {/* LEAVE TYPE */}
                   <label className="act-form-field">
 
                     <span>
                       Leave Type *
                     </span>
 
-                    {/* <select
-                      value={form.leaveTypeId}
-                      onChange={(e) =>
-                        setForm((c) => ({
-                          ...c,
-                          leaveTypeId: e.target.value,
-                        }))
-                      }
-                    >
+         
 
-                      <option value="">
-                        Select Leave Type
-                      </option>
-
-                      {leaveTypes.map((leave) => (
-
-                        <option
-                          key={leave.id}
-                          value={leave.id}
-                        >
-
-                          {leave.leaveTypeName}
-
-                        </option>
-
-                      ))}
-
-                    </select> */}
+                  
 
                     <Select
                       menuPortalTarget={document.body}
@@ -608,66 +590,47 @@ export function MyApplicationsPage() {
 
                   </label>
 
-                  {/* HALF DAY */}
                   <label className="act-form-field">
-
-                    <span>
-                      Half Day *
-                    </span>
-
+                    <span>Half Day *</span>
                     <div className="halfday-radio-group">
-
-                      {/* TRUE */}
                       <label className="halfday-radio">
-
                         <input
                           type="radio"
                           name="halfDay"
                           checked={form.isHalfDay === true}
                           onChange={() =>
-                            setForm((c) => ({
-                              ...c,
+                            setForm((current) => ({
+                              ...current,
                               isHalfDay: true,
-                              toDate: c.fromDate,
+                              toDate: current.fromDate,
                             }))
                           }
                         />
-
                         <span>True</span>
-
                       </label>
-
-                      {/* FALSE */}
                       <label className="halfday-radio">
-
                         <input
                           type="radio"
                           name="halfDay"
                           checked={form.isHalfDay === false}
                           onChange={() =>
-                            setForm((c) => ({
-                              ...c,
+                            setForm((current) => ({
+                              ...current,
                               isHalfDay: false,
                               session: '',
                             }))
                           }
                         />
-
                         <span>False</span>
-
                       </label>
-
                     </div>
-
                   </label>
-
                 </div>
 
-                {/* ROW 2 */}
                 <div className="act-form-row">
 
                   {/* FROM DATE */}
-                  {/* <label className="act-form-field">
+                  <label className="act-form-field">
 
                     <span>
                       From Date *
@@ -676,20 +639,19 @@ export function MyApplicationsPage() {
                     <input
                       type="date"
                       value={form.fromDate}
-                      onChange={(e) =>
-                        setForm((c) => ({
-                          ...c,
-                          fromDate: e.target.value,
-
-                          toDate:
-                            c.isHalfDay
-                              ? e.target.value
-                              : c.toDate,
+                      onChange={(event) =>
+                        setForm((current) => ({
+                          ...current,
+                          fromDate: event.target.value,
+                          toDate: current.isHalfDay
+                            ? event.target.value
+                            : current.toDate,
                         }))
                       }
                     />
 
-                  </label> */}
+                  </label> 
+        
                   <label className="act-form-field">
                     <span>
                       From Date *
@@ -747,7 +709,7 @@ export function MyApplicationsPage() {
                   </label>
 
                   {/* TO DATE */}
-                  {/* <label className="act-form-field">
+                  <label className="act-form-field">
 
                     <span>
                       To Date *
@@ -755,21 +717,17 @@ export function MyApplicationsPage() {
 
                     <input
                       type="date"
-                      value={
-                        form.isHalfDay
-                          ? form.fromDate
-                          : form.toDate
-                      }
+                      value={form.isHalfDay ? form.fromDate : form.toDate}
                       disabled={form.isHalfDay}
-                      onChange={(e) =>
-                        setForm((c) => ({
-                          ...c,
-                          toDate: e.target.value,
+                      onChange={(event) =>
+                        setForm((current) => ({
+                          ...current,
+                          toDate: event.target.value,
                         }))
                       }
                     />
 
-                  </label> */}
+                  </label> 
                   <label className="act-form-field">
 
                     <span>
@@ -824,11 +782,8 @@ export function MyApplicationsPage() {
                   </label>
                 </div>
 
-                {/* SESSION */}
                 {form.isHalfDay && (
-
                   <div className="act-form-row">
-
                     <label className="act-form-field">
 
                       <span>
@@ -837,10 +792,10 @@ export function MyApplicationsPage() {
 
                       {/* <select
                         value={form.session}
-                        onChange={(e) =>
-                          setForm((c) => ({
-                            ...c,
-                            session: e.target.value,
+                        onChange={(event) =>
+                          setForm((current) => ({
+                            ...current,
+                            session: event.target.value,
                           }))
                         }
                       >
@@ -898,68 +853,44 @@ export function MyApplicationsPage() {
                       />
 
                     </label>
-
                   </div>
-
                 )}
 
-                {/* WORK HOURS + REASON */}
                 <div className="act-form-row">
-
-                  {/* WORK HOURS */}
                   <label className="act-form-field">
-
-                    <span>
-                      Work Hours
-                    </span>
-
+                    <span>Work Hours</span>
                     <input
                       type="number"
                       min="0"
                       max="24"
                       value={form.workHours}
-                      onChange={(e) =>
-                        setForm((c) => ({
-                          ...c,
-                          workHours: e.target.value,
+                      placeholder="Enter work hours"
+                      onChange={(event) =>
+                        setForm((current) => ({
+                          ...current,
+                          workHours: event.target.value,
                         }))
                       }
-                      placeholder="Enter work hours"
                     />
-
                   </label>
 
-                  {/* REASON */}
                   <label className="act-form-field">
-
-                    <span>
-                      Reason *
-                    </span>
-
+                    <span>Reason *</span>
                     <textarea
                       rows={3}
                       value={form.reason}
-                      onChange={(e) =>
-                        setForm((c) => ({
-                          ...c,
-                          reason: e.target.value,
+                      placeholder="Enter leave reason"
+                      onChange={(event) =>
+                        setForm((current) => ({
+                          ...current,
+                          reason: event.target.value,
                         }))
                       }
-                      placeholder="Enter leave reason"
                     />
-
                   </label>
-
                 </div>
 
-                {/* ERROR */}
-                {error && (
-
-                  <div className="form-error">
-                    {error}
-                  </div>
-
-                )}
+                {error && <div className="form-error">{error}</div>}
 
 
               </form>
@@ -970,7 +901,7 @@ export function MyApplicationsPage() {
                 <button
                   type="button"
                   className="act-cancel-btn"
-                  onClick={closeModal}
+                  onClick={closeLeaveModal}
                 >
                   Cancel
                 </button>
@@ -990,13 +921,9 @@ export function MyApplicationsPage() {
               </div>
 
             </div>
-
           </div>
-
         )}
-
       </div>
-
     </Layout>
   )
 }

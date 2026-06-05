@@ -22,6 +22,7 @@ public class HrmsDbContext : DbContext
     public DbSet<UserLeaveBalance> UserLeaveBalances => Set<UserLeaveBalance>();
     public DbSet<UserAttendanceLog> UserAttendanceLogs => Set<UserAttendanceLog>();
     public DbSet<HolidayList> HolidayLists => Set<HolidayList>();
+    public DbSet<AttendanceRegularization> AttendanceRegularizations => Set<AttendanceRegularization>();
     public DbSet<CompanyPolicies> 
     
     CompanyPolicies => Set<CompanyPolicies>();
@@ -352,6 +353,80 @@ public class HrmsDbContext : DbContext
             entity.Property(x => x.HalfDayThreshold).HasColumnName("halfday_threshold");
             entity.Property(x => x.CheckInGracePeriod).HasColumnName("checkin_graceperiod");
             entity.Property(x => x.CheckOutGracePeriod).HasColumnName("checkout_graceperiod");
+        });
+
+                modelBuilder.Entity<AttendanceRegularization>(entity =>
+        {
+            entity.ToTable("attendanceregularizations", t =>
+            {
+                t.HasCheckConstraint(
+                    "chk_ar_approvalstatus",
+                    "approvalstatus IN ('PENDING','APPROVED','REJECTED','CANCELLED')");
+                t.HasCheckConstraint(
+                    "chk_ar_requested_times",
+                    "requestedcheckouttime > requestedcheckintime");
+            });
+
+            entity.Property(x => x.LogDate).HasColumnType("date");
+
+            entity.Property(x => x.OriginalCheckInTime)
+                .HasColumnType("timestamp with time zone");
+            entity.Property(x => x.OriginalCheckOutTime)
+                .HasColumnType("timestamp with time zone");
+            entity.Property(x => x.RequestedCheckInTime)
+                .HasColumnType("timestamp with time zone");
+            entity.Property(x => x.RequestedCheckOutTime)
+                .HasColumnType("timestamp with time zone");
+            entity.Property(x => x.ApprovedOn)
+                .HasColumnType("timestamp with time zone");
+
+            entity.Property(x => x.Reason).IsRequired().HasMaxLength(500);
+            entity.Property(x => x.ApprovalStatus)
+                .IsRequired()
+                .HasMaxLength(20)
+                .HasDefaultValue("PENDING");
+            entity.Property(x => x.ApproverRemark).HasMaxLength(500);
+
+            entity.Property(x => x.StatusCode)
+                .IsRequired()
+                .HasDefaultValue((short)1);
+            entity.Property(x => x.CreatedOn).HasDefaultValueSql("NOW()");
+            entity.Property(x => x.UpdatedOn).HasDefaultValueSql("NOW()");
+
+            // Only one active PENDING request per user per date
+            entity.HasIndex(x => new { x.UserId, x.LogDate })
+                .IsUnique()
+                .HasFilter("approvalstatus = 'PENDING' AND statuscode = 1")
+                .HasDatabaseName("uq_ar_user_date_pending");
+
+            entity.HasIndex(x => x.UserId)
+                .HasDatabaseName("idx_ar_userid");
+            entity.HasIndex(x => x.LogDate)
+                .HasDatabaseName("idx_ar_logdate");
+            entity.HasIndex(x => x.ApprovalStatus)
+                .HasDatabaseName("idx_ar_approvalstatus");
+            entity.HasIndex(x => x.ApprovedBy)
+                .HasDatabaseName("ix_ar_approvedby");
+            entity.HasIndex(x => x.AttendanceLogId)
+                .HasDatabaseName("ix_ar_attendancelogid");
+
+            entity.HasOne<UserMaster>()
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .HasConstraintName("fk_ar_user")
+                .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasOne<UserAttendanceLog>()
+                .WithMany()
+                .HasForeignKey(x => x.AttendanceLogId)
+                .HasConstraintName("fk_ar_attendance_log")
+                .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasOne<UserMaster>()
+                .WithMany()
+                .HasForeignKey(x => x.ApprovedBy)
+                .HasConstraintName("fk_ar_approver")
+                .OnDelete(DeleteBehavior.NoAction);
         });
     }
 }

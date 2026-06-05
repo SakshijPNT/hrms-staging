@@ -6,6 +6,9 @@ import type { AxiosError } from 'axios'
 import { FiSearch } from 'react-icons/fi'
 import { MdEdit } from "react-icons/md";
 import Select from 'react-select'
+import HolidayInlineEditor, {
+  type HolidayRow,
+} from '../components/HolidayInlineEditor'
 
 interface CompanyItem {
   id: number
@@ -38,15 +41,8 @@ export function CompanyPage() {
   const [error, setError] =
     useState('')
 
-  const session = JSON.parse(
-    localStorage.getItem('session') || '{}'
-  )
-
-  const hasCompanyAccess =
-    session.activities?.some(
-      (activity: { activityCode: string }) =>
-        activity.activityCode === 'A0'
-    )
+const [hasCompanyAccess, setHasCompanyAccess] =
+  useState(false)
 
   const [form, setForm] = useState({
     companyName: '',
@@ -60,6 +56,8 @@ export function CompanyPage() {
     timezone: 'Asia/Kolkata',
     statusCode: 1,
   })
+
+  const [holidays, setHolidays] = useState<HolidayRow[]>([])
 
   const timezones = [
     'Asia/Kolkata',
@@ -99,16 +97,36 @@ export function CompanyPage() {
     }
   }
 
-  useEffect(() => {
+            useEffect(() => {
+            async function loadCompanies() {
+              try {
+                const sessionResponse = await api.get('/auth/session')
 
-    async function loadCompanies() {
+                const sessionDataResponse = await api.get(
+                  `/auth/session-data/${sessionResponse.data.userId}`
+                )
 
-      await fetchCompanies()
-    }
+                const hasA0 =
+                  sessionDataResponse.data.activities?.some(
+                    (activity: { activityCode: string }) =>
+                      activity.activityCode === 'A0'
+                  ) || false
 
-    loadCompanies()
+                setHasCompanyAccess(hasA0)
 
-  }, [])
+                const response = await api.get(
+                  '/Company/GetCompanies'
+                )
+
+                setCompanies(response.data)
+              } catch (error) {
+                console.error(error)
+              }
+            }
+
+            loadCompanies()
+
+            }, [])
 
   useEffect(() => {
 
@@ -170,6 +188,8 @@ export function CompanyPage() {
       timezone: 'Asia/Kolkata',
       statusCode: 1,
     })
+
+    setHolidays([])
 
     setError('')
 
@@ -313,6 +333,19 @@ export function CompanyPage() {
         pincode: form.pincode,
         timezone: form.timezone,
         statusCode: form.statusCode,
+        holidays: editingCompanyId
+          ? undefined
+          : holidays
+              .filter(
+                (holiday) =>
+                  holiday.holidayDate.trim() &&
+                  holiday.holidayName.trim()
+              )
+              .map((holiday) => ({
+                holidayDate: holiday.holidayDate,
+                holidayName: holiday.holidayName,
+                description: holiday.description || null,
+              })),
       }
 
       // EDIT
@@ -824,6 +857,13 @@ export function CompanyPage() {
 
 
                 </div>
+
+                {!editingCompanyId && (
+                  <HolidayInlineEditor
+                    holidays={holidays}
+                    onChange={setHolidays}
+                  />
+                )}
 
                 {error && (
 

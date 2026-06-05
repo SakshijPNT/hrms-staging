@@ -17,6 +17,9 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<ICompanyManager, CompanyManager>();
         services.AddScoped<IAttendanceManager, AttendanceManager>();
         services.AddScoped<IPolicyManager, PolicyManager>();
+        services.AddScoped<IHolidayManager, HolidayManager>();
+        services.AddScoped<ICalendarManager, CalendarManager>();
+        services.AddScoped<IRegularizationManager, RegularizationManager>();
         return services;
     }
 }

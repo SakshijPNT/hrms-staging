@@ -21,37 +21,43 @@ export default function Login() {
   const [error, setError] =
     useState<string>('')
 
-  const handleLogin = async (
-    e: FormEvent<HTMLFormElement>
-  ) => {
-    e.preventDefault()
+ const handleLogin = async (
+  e: FormEvent<HTMLFormElement>
+   ) => {
 
-    try {
-      setError('')
+  e.preventDefault()
 
-      const response = await api.post(
-        '/auth/login',
-        {
-          emailId,
-          password,
+  try {
+
+    setError('')
+
+    await api.post(
+      '/auth/login',
+      {
+        emailId,
+        password,
+      }
+    )
+
+    // Redirect after login
+    navigate('/dashboard')
+
+  } catch (err: unknown) {
+
+    setError(
+      (
+        err as {
+          response?: {
+            data?: { 
+              message?: string
+            }
+          }
         }
-      )
-
-      // Store session info
-      localStorage.setItem(
-        'session',
-        JSON.stringify(response.data)
-      )
-
-      // Redirect to Roles page
-      navigate('/dashboard')
-    } catch (err: unknown) {
-      setError(
-        (err as { response?: { data?: { message?: string } } }).response?.data?.message ||
-        'Invalid Email ID or Password'
-      )
-    }
+      ).response?.data?.message ||
+      'Invalid Email ID or Password'
+    )
   }
+}
 
   const [showPassword, setShowPassword] =
     useState<boolean>(false)

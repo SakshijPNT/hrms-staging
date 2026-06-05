@@ -24,10 +24,14 @@ import {
   RiTeamLine,
 } from 'react-icons/ri'
 
-interface ModuleItem {
+import type {
+  ModuleGroup,
+} from '../../types/auth'
+
+/*interface ModuleItem {
   id: number
   moduleName: string
-  description: string
+  description?: string
   iconUrl: string | null
 }
 
@@ -35,7 +39,7 @@ interface ModuleGroup {
   groupId: number
   groupName: string
   modules: ModuleItem[]
-}
+}*/
 
 interface SidebarProps {
   groups: ModuleGroup[]

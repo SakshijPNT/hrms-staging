@@ -3,6 +3,7 @@ using System;
 using Hrms.NewApi.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Hrms.NewApi.Migrations
 {
     [DbContext(typeof(HrmsDbContext))]
-    partial class HrmsDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260602091056_AddAttendanceRegularization")]
+    partial class AddAttendanceRegularization
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -198,126 +201,6 @@ namespace Hrms.NewApi.Migrations
                         .HasDatabaseName("uq_arm_activity_role");
 
                     b.ToTable("activityrolemapping", (string)null);
-                });
-
-            modelBuilder.Entity("Hrms.NewApi.Models.AttendanceRegularization", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("ApprovalStatus")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasDefaultValue("PENDING")
-                        .HasColumnName("approvalstatus");
-
-                    b.Property<int?>("ApprovedBy")
-                        .HasColumnType("integer")
-                        .HasColumnName("approvedby");
-
-                    b.Property<DateTimeOffset?>("ApprovedOn")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("approvedon");
-
-                    b.Property<string>("ApproverRemark")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("approverremark");
-
-                    b.Property<int?>("AttendanceLogId")
-                        .HasColumnType("integer")
-                        .HasColumnName("attendancelogid");
-
-                    b.Property<int>("CreatedBy")
-                        .HasColumnType("integer")
-                        .HasColumnName("createdby");
-
-                    b.Property<DateTimeOffset>("CreatedOn")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("createdon")
-                        .HasDefaultValueSql("NOW()");
-
-                    b.Property<DateOnly>("LogDate")
-                        .HasColumnType("date")
-                        .HasColumnName("logdate");
-
-                    b.Property<DateTimeOffset?>("OriginalCheckInTime")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("originalcheckintime");
-
-                    b.Property<DateTimeOffset?>("OriginalCheckOutTime")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("originalcheckouttime");
-
-                    b.Property<string>("Reason")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("reason");
-
-                    b.Property<DateTimeOffset>("RequestedCheckInTime")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("requestedcheckintime");
-
-                    b.Property<DateTimeOffset>("RequestedCheckOutTime")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("requestedcheckouttime");
-
-                    b.Property<short>("StatusCode")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("smallint")
-                        .HasDefaultValue((short)1)
-                        .HasColumnName("statuscode");
-
-                    b.Property<int>("UpdatedBy")
-                        .HasColumnType("integer")
-                        .HasColumnName("updatedby");
-
-                    b.Property<DateTimeOffset>("UpdatedOn")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updatedon")
-                        .HasDefaultValueSql("NOW()");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("integer")
-                        .HasColumnName("userid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ApprovalStatus")
-                        .HasDatabaseName("idx_ar_approvalstatus");
-
-                    b.HasIndex("ApprovedBy")
-                        .HasDatabaseName("ix_ar_approvedby");
-
-                    b.HasIndex("AttendanceLogId")
-                        .HasDatabaseName("ix_ar_attendancelogid");
-
-                    b.HasIndex("LogDate")
-                        .HasDatabaseName("idx_ar_logdate");
-
-                    b.HasIndex("UserId")
-                        .HasDatabaseName("idx_ar_userid");
-
-                    b.HasIndex("UserId", "LogDate")
-                        .IsUnique()
-                        .HasDatabaseName("uq_ar_user_date_pending")
-                        .HasFilter("approvalstatus = 'PENDING' AND statuscode = 1");
-
-                    b.ToTable("attendanceregularizations", null, t =>
-                        {
-                            t.HasCheckConstraint("chk_ar_approvalstatus", "approvalstatus IN ('PENDING','APPROVED','REJECTED','CANCELLED')");
-
-                            t.HasCheckConstraint("chk_ar_requested_times", "requestedcheckouttime > requestedcheckintime");
-                        });
                 });
 
             modelBuilder.Entity("Hrms.NewApi.Models.CompanyMaster", b =>
@@ -1217,28 +1100,6 @@ namespace Hrms.NewApi.Migrations
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired()
                         .HasConstraintName("fk_arm_role");
-                });
-
-            modelBuilder.Entity("Hrms.NewApi.Models.AttendanceRegularization", b =>
-                {
-                    b.HasOne("Hrms.NewApi.Models.UserMaster", null)
-                        .WithMany()
-                        .HasForeignKey("ApprovedBy")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .HasConstraintName("fk_ar_approver");
-
-                    b.HasOne("Hrms.NewApi.Models.UserAttendanceLog", null)
-                        .WithMany()
-                        .HasForeignKey("AttendanceLogId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .HasConstraintName("fk_ar_attendance_log");
-
-                    b.HasOne("Hrms.NewApi.Models.UserMaster", null)
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired()
-                        .HasConstraintName("fk_ar_user");
                 });
 
             modelBuilder.Entity("Hrms.NewApi.Models.CompanyPolicies", b =>

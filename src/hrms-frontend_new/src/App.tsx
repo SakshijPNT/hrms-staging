@@ -10,61 +10,92 @@ import Dashboard from './pages/Dashboard'
 import { RolesPage } from './pages/Roles'
 import { UsersPage } from './pages/Users'
 import { MyApplicationsPage } from './pages/MyApplications'
+import { RegularizationApprovalsPage } from './pages/RegularizationApprovals'
 import { CompanyPage } from './pages/Company'
-import  { PolicyPage } from './pages/Policy'
+import { PolicyPage } from './pages/Policy'
+import ProtectedRoute from './components/ProtectedRoute'
+import PublicRoute from './components/PublicRoute'
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
 
-        {/* Default */}
         <Route
           path="/"
+          element={<Navigate to="/login" replace />}
+        />
+
+        <Route
+          path="/login"
           element={
-            <Navigate to="/login" />
+            <PublicRoute>
+              <Login />
+            </PublicRoute>
           }
         />
 
-        {/* Login */}
-        <Route
-          path="/login"
-          element={<Login />}
-        />
-
-        {/* Dashboard */}
         <Route
           path="/dashboard"
-          element={<Dashboard />}
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          }
         />
 
-        {/* Roles */}
         <Route
           path="/roles"
-          element={<RolesPage />}
+          element={
+            <ProtectedRoute>
+              <RolesPage />
+            </ProtectedRoute>
+          }
         />
 
-        {/* Users */}
         <Route
           path="/users"
-          element={<UsersPage />}
+          element={
+            <ProtectedRoute>
+              <UsersPage />
+            </ProtectedRoute>
+          }
         />
 
         <Route
-        path="/my-applications"
-        element={<MyApplicationsPage />}
+          path="/my-applications"
+          element={
+            <ProtectedRoute>
+              <MyApplicationsPage />
+            </ProtectedRoute>
+          }
         />
 
-        {/* Company */}
+        <Route
+          path="/regularization-approvals"
+          element={
+            <ProtectedRoute>
+              <RegularizationApprovalsPage />
+            </ProtectedRoute>
+          }
+        />
+
         <Route
           path="/company-configuration"
-          element={<CompanyPage />}
+          element={
+            <ProtectedRoute>
+              <CompanyPage />
+            </ProtectedRoute>
+          }
         />
 
-        {/* Policy */}
         <Route
           path="/policy-configuration"
-          element={<PolicyPage />}
+          element={
+            <ProtectedRoute>
+              <PolicyPage />
+            </ProtectedRoute>
+          }
         />
 
       </Routes>

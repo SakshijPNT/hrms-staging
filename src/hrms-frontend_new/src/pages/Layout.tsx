@@ -1,34 +1,103 @@
-import { useState } from 'react'
+import {
+  useEffect,
+  useState
+} from 'react'
+
+import { useNavigate } from 'react-router-dom'
 
 import '../styles/Style.css'
 
 import Sidebar from '../components/Sidebar'
 import Header from '../components/Header'
 
+import api from '../services/api'
+
+import type {
+  SessionInfo,
+  ModuleGroup,
+} from '../../types/auth' 
+ 
+
 interface LayoutProps {
   title: string
   children: React.ReactNode
 }
+
+
+
+
+/*interface ModuleItem {
+  id: number
+  moduleName: string
+  description?: string
+  iconUrl?: string
+}
+
+interface ModuleGroup {
+  groupId: number
+  groupName: string
+  modules: ModuleItem[]
+}*/
 
 export default function Layout({
   title,
   children,
 }: LayoutProps) {
 
-  const session = JSON.parse(
-    localStorage.getItem('session') || '{}'
-  )
+  // SESSION
+  const [session, setSession] =
+    useState<SessionInfo | null>(null)
 
-  const groups =
-    session.groups || []
+  // MODULE GROUPS
+  const [groups, setGroups] =
+    useState<ModuleGroup[]>([])
 
-  /* SUBMENU STATE */
+  // OPEN GROUP
   const [openGroup, setOpenGroup] =
     useState<string | null>('Settings')
 
-  /* SIDEBAR STATE */
+  // SIDEBAR
   const [sidebarOpen, setSidebarOpen] =
     useState(true)
+
+    const navigate = useNavigate()
+
+    useEffect(() => {
+  
+      async function loadData() {
+  
+        try {
+  
+          const sessionResponse =
+            await api.get('/auth/session')
+  
+          setSession(
+            sessionResponse.data
+          )
+  
+          const moduleResponse =
+            await api.get(
+              `/auth/session-data/${sessionResponse.data.userId}`
+            )
+  
+          setGroups(
+            moduleResponse.data.groups || []
+          )
+  
+        } catch (error) {
+  
+          console.error(
+            'Failed to load session',
+            error
+          )
+  
+          navigate('/login', { replace: true })
+        }
+      }
+  
+      loadData()
+  
+    }, [navigate])
 
   function toggleGroup(group: string) {
 
@@ -36,6 +105,11 @@ export default function Layout({
       prev === group ? null : group
     )
   }
+
+  if (!session) {
+    return null
+  }
+
 
   return (
 
@@ -57,7 +131,7 @@ export default function Layout({
         toggleGroup={toggleGroup}
         sidebarOpen={sidebarOpen}
         setSidebarOpen={setSidebarOpen}
-      />
+      />  
 
       <main className="main-content">
 

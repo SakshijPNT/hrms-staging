@@ -5,6 +5,9 @@ import '../styles/Style.css'
 import { MdEdit } from "react-icons/md";
 import { FiSearch, FiPlus } from 'react-icons/fi'
 import Select, { components } from 'react-select'
+import HolidayInlineEditor, {
+  type HolidayRow,
+} from '../components/HolidayInlineEditor'
 
 interface PolicyItem {
   id: number
@@ -48,6 +51,9 @@ export function PolicyPage() {
     shiftEnd: '17:00'
   })
 
+  const [holidays, setHolidays] = useState<HolidayRow[]>([])
+  const [loadedHolidayIds, setLoadedHolidayIds] = useState<number[]>([])
+
   const [currentPage, setCurrentPage] =
     useState(1)
 
@@ -88,6 +94,81 @@ export function PolicyPage() {
     } catch (error) {
 
       console.error(error)
+    }
+  }
+
+  async function fetchHolidays(companyId: number) {
+    try {
+      const year = new Date().getFullYear()
+      const response = await api.get('/Holiday', {
+        params: { companyId, year },
+      })
+
+      const rows: HolidayRow[] = (response.data ?? []).map(
+        (holiday: {
+          id: number
+          holidayDate: string
+          holidayName: string
+          description: string | null
+        }) => ({
+          id: holiday.id,
+          holidayDate: holiday.holidayDate,
+          holidayName: holiday.holidayName,
+          description: holiday.description ?? '',
+        })
+      )
+
+      setHolidays(rows)
+      setLoadedHolidayIds(rows.map((row) => row.id!).filter(Boolean))
+    } catch (error) {
+      console.error('Failed to load holidays', error)
+      setHolidays([])
+      setLoadedHolidayIds([])
+    }
+  }
+
+  async function syncHolidays(companyId: number) {
+    const currentIds = holidays
+      .map((holiday) => holiday.id)
+      .filter((id): id is number => Boolean(id))
+
+    const deletedIds = loadedHolidayIds.filter(
+      (id) => !currentIds.includes(id)
+    )
+
+    for (const id of deletedIds) {
+      await api.delete(`/Holiday/${id}`, {
+        params: { companyId },
+      })
+    }
+
+    const newHolidays = holidays.filter(
+      (holiday) =>
+        !holiday.id &&
+        holiday.holidayDate.trim() &&
+        holiday.holidayName.trim()
+    )
+
+    if (newHolidays.length > 0) {
+      await api.post('/Holiday/bulk', {
+        companyId,
+        holidays: newHolidays.map((holiday) => ({
+          holidayDate: holiday.holidayDate,
+          holidayName: holiday.holidayName,
+          description: holiday.description || null,
+        })),
+      })
+    }
+
+    for (const holiday of holidays.filter((row) => row.id)) {
+      const original = loadedHolidayIds.includes(holiday.id!)
+      if (!original) continue
+
+      await api.put(`/Holiday/${holiday.id}`, {
+        id: holiday.id,
+        holidayName: holiday.holidayName,
+        description: holiday.description || null,
+      })
     }
   }
 
@@ -148,6 +229,9 @@ export function PolicyPage() {
       shiftEnd: '17:00'
     })
 
+    setHolidays([])
+    setLoadedHolidayIds([])
+
     setError('')
 
     setModalOpen(true)
@@ -179,6 +263,19 @@ export function PolicyPage() {
 
     setModalOpen(true)
   }
+
+  useEffect(() => {
+    if (!modalOpen || !form.companyId) {
+      return
+    }
+
+    const companyId = Number(form.companyId)
+    if (!Number.isFinite(companyId) || companyId <= 0) {
+      return
+    }
+
+    fetchHolidays(companyId)
+  }, [form.companyId, modalOpen])
 
   async function handleSubmit(
     event: FormEvent<HTMLFormElement>
@@ -251,6 +348,12 @@ export function PolicyPage() {
               `${form.shiftEnd}:00`
           }
         )
+      }
+
+      const companyId = Number(form.companyId)
+
+      if (companyId > 0) {
+        await syncHolidays(companyId)
       }
 
       closeModal()
@@ -645,6 +748,13 @@ export function PolicyPage() {
                   </label>
 
                 </div>
+
+                {form.companyId && (
+                  <HolidayInlineEditor
+                    holidays={holidays}
+                    onChange={setHolidays}
+                  />
+                )}
 
                 {error && (
 

@@ -285,6 +285,7 @@ export function UsersPage() {
 
 
 
+
   async function handleSubmit(
     event: FormEvent<HTMLFormElement>
   ) {
@@ -879,6 +880,7 @@ export function UsersPage() {
 
                 <button
                   type="submit"
+                  form="user-form"
                   className="act-submit-btn"
                 >
                   {editingUserId

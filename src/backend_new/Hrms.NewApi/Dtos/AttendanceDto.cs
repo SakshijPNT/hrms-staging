@@ -44,3 +44,12 @@ public class AttendanceSummaryDto
     public int TotalLateDays { get; set; }
     public decimal TotalWorkedHours { get; set; }
 }
+
+public class TodayAttendanceResponseDto
+{
+    public DateOnly LogDate { get; set; }
+    public string DayType { get; set; } = "WORKING";
+    public bool IsCheckInAllowed { get; set; } = true;
+    public string? DayLabel { get; set; }
+    public AttendanceResponseDto? Attendance { get; set; }
+}

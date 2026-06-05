@@ -215,3 +215,26 @@ public class CompanyPolicies
     public int UpdatedBy { get; set; }
     public DateTimeOffset UpdatedOn { get; set; }
 }
+
+public class AttendanceRegularization
+{
+    public int Id { get; set; }
+    public int UserId { get; set; }
+    public DateOnly LogDate { get; set; }
+    /// <summary>Optional link to existing user_attendance_logs row for that date.</summary>
+    public int? AttendanceLogId { get; set; }
+    public DateTimeOffset? OriginalCheckInTime { get; set; }
+    public DateTimeOffset? OriginalCheckOutTime { get; set; }
+    public DateTimeOffset RequestedCheckInTime { get; set; }
+    public DateTimeOffset RequestedCheckOutTime { get; set; }
+    public string Reason { get; set; } = null!;
+    public string ApprovalStatus { get; set; } = "PENDING";
+    public int? ApprovedBy { get; set; }
+    public DateTimeOffset? ApprovedOn { get; set; }
+    public string? ApproverRemark { get; set; }
+    public short StatusCode { get; set; } = 1;
+    public int CreatedBy { get; set; }
+    public DateTimeOffset CreatedOn { get; set; }
+    public int UpdatedBy { get; set; }
+    public DateTimeOffset UpdatedOn { get; set; }
+}

@@ -11,10 +11,14 @@ public class CompanyController : ControllerBase
 {
     private const string SessionKey = "UserSession";
     private readonly ICompanyManager _companyManager;
+    private readonly IHolidayManager _holidayManager;
 
-    public CompanyController(ICompanyManager companyManager)
+    public CompanyController(
+        ICompanyManager companyManager,
+        IHolidayManager holidayManager)
     {
         _companyManager = companyManager;
+        _holidayManager = holidayManager;
     }
 
     [HttpPost("CreateCompany")]
@@ -39,6 +43,18 @@ public class CompanyController : ControllerBase
                 request,
                 session.UserId,
                 cancellationToken);
+
+            if (request.Holidays.Count > 0)
+            {
+                await _holidayManager.BulkCreateHolidaysAsync(
+                    new HolidayBulkCreateDto
+                    {
+                        CompanyId = company.Id,
+                        Holidays = request.Holidays,
+                    },
+                    session.UserId,
+                    cancellationToken);
+            }
 
             return CreatedAtAction(nameof(GetCompanies), new { id = company.Id }, company);
         }
