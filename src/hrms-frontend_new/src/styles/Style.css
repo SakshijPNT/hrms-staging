@@ -70,7 +70,9 @@ button,
 .leaves-stats,
 .act-leave-card,
 .act-table-wrapper:has(.leaves-table),
+.act-table-wrapper:has(.approval-table),
 .leaves-table td,
+.approval-table td,
 .leave-status-text,
 .footer-label,
 .footer-value,
@@ -100,6 +102,7 @@ button,
 .pagination-btn,
 .attendance-action-btn,
 .leave-table-action-btn,
+.approval-action-btn,
 .attendance-month-btn,
 .edit-btn,
 .act-modal-close,
@@ -547,11 +550,13 @@ textarea:disabled,
   margin-bottom: 18px;
 }
 
-.regularization-date-readonly {
+.regularization-date-readonly,
+.approval-detail-readonly {
   background: #f1f5f9 !important;
   color: #334155;
   cursor: default;
   pointer-events: none;
+  user-select: none;
 }
 
 /* =========================
@@ -3056,6 +3061,175 @@ box-shadow:
 .leave-table-action-btn:hover {
   background: var(--bg-soft);
   color: var(--secondary);
+}
+
+/* my approval */
+.approval-toolbar {
+  margin-bottom: 18px;
+}
+
+.approval-filters {
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.approval-search-wrapper {
+  position: relative;
+  flex: 1;
+  min-width: 220px;
+  max-width: 320px;
+}
+
+.approval-search-wrapper .act-search {
+  width: 100%;
+  padding-left: 40px;
+}
+
+.approval-table td {
+  font-size: 14px;
+  user-select: none;
+  cursor: default;
+}
+
+.act-table-wrapper:has(.approval-table) {
+  user-select: none;
+  cursor: default;
+}
+
+.approval-table .role-pagination {
+  user-select: none;
+  cursor: default;
+}
+
+.approval-action-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.approval-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 14px;
+  line-height: 1;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.approval-action-btn.view {
+  background: transparent;
+  border: 1.5px solid transparent;
+  color: #64748b;
+  font-size: 17px;
+}
+
+.approval-action-btn.view:hover {
+  background: var(--bg-soft);
+  border-color: transparent;
+  color: var(--secondary);
+}
+
+.approval-action-btn.reject {
+  background: transparent;
+  border: 1.5px solid #ef4444;
+  color: #ef4444;
+  font-size: 12px;
+}
+
+.approval-action-btn.approve {
+  background: transparent;
+  border: 1.5px solid #22c55e;
+  color: #22c55e;
+  font-size: 12px;
+}
+
+.approval-action-btn.reject:hover {
+  background: #fef2f2;
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+.approval-action-btn.approve:hover {
+  background: #f0fdf4;
+  border-color: #22c55e;
+  color: #22c55e;
+}
+
+.act-reject-btn {
+  border: none;
+  border-radius: 10px;
+  padding: 0 16px;
+  height: 40px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  background: #ef4444;
+  color: #ffffff;
+  transition: background-color 0.2s ease;
+}
+
+.act-reject-btn:hover {
+  background: #dc2626;
+}
+
+.approval-employee-reason {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.approval-employee-reason span {
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.approval-employee-reason-value {
+  margin: 0;
+  padding: 10px 14px;
+  background: #f1f5f9;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #334155;
+  line-height: 1.5;
+  user-select: none;
+  word-break: break-word;
+}
+
+.approval-modal-form {
+  padding: 18px 24px;
+}
+
+.approval-modal-form .act-form-row {
+  margin-bottom: 12px;
+}
+
+.approval-modal-form .act-form-row:last-child {
+  margin-bottom: 0;
+}
+
+.approval-manager-note {
+  min-height: 90px !important;
+  height: 90px;
+  max-height: 90px;
+}
+
+.approval-rejection-note {
+  min-height: 110px !important;
+  height: 110px;
+  max-height: 110px;
 }
 
 .halfday-radio-group {

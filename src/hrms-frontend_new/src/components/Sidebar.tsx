@@ -11,6 +11,7 @@ import {
   HiOutlineUsers,
   HiOutlineBuildingOffice2,
   HiOutlineCalendarDays,
+  HiOutlineClipboardDocumentCheck,
 } from 'react-icons/hi2'
 
 import {
@@ -106,6 +107,14 @@ const moduleRoutes: Record<
     ),
   },
 
+  'My Approval': {
+    path: '/my-approval',
+    label: 'My Approval',
+    icon: (
+      <HiOutlineClipboardDocumentCheck className="menu-icon" />
+    ),
+  },
+
   Settings: {
     path: '/settings',
     label: 'Settings',
@@ -136,39 +145,63 @@ const SIDEBAR_MODULE_ORDER: Record<string, number> = {
   Users: 1,
   Roles: 2,
   'My Leaves': 3,
-  'My Applications': 4,
-  'My Team': 5,
+  'My Approval': 4,
+  'My Applications': 5,
+  'My Team': 6,
   Settings: 100,
 }
 
-const MY_LEAVES_GROUP: ModuleGroup = {
-  groupId: 999901,
-  groupName: 'My Leaves',
-  modules: [
-    {
-      id: 999901,
-      moduleName: 'My Leaves',
-      description: 'My Leaves',
-      iconUrl: null,
-    },
-  ],
-}
+const FRONTEND_ONLY_MODULES: ModuleGroup[] = [
+  {
+    groupId: 999901,
+    groupName: 'My Leaves',
+    modules: [
+      {
+        id: 999901,
+        moduleName: 'My Leaves',
+        description: 'My Leaves',
+        iconUrl: null,
+      },
+    ],
+  },
+  {
+    groupId: 999902,
+    groupName: 'My Approval',
+    modules: [
+      {
+        id: 999902,
+        moduleName: 'My Approval',
+        description: 'My Approval',
+        iconUrl: null,
+      },
+    ],
+  },
+]
 
 function enhanceSidebarGroups(
   groups: ModuleGroup[]
 ): ModuleGroup[] {
-  const hasMyLeaves = groups.some((group) =>
-    group.modules.some(
-      (module) =>
-        module.moduleName === 'My Leaves'
+  const existingModuleNames = new Set(
+    groups.flatMap((group) =>
+      group.modules.map(
+        (module) => module.moduleName
+      )
     )
   )
 
-  if (hasMyLeaves) {
+  const modulesToAdd =
+    FRONTEND_ONLY_MODULES.filter(
+      (group) =>
+        !existingModuleNames.has(
+          group.modules[0].moduleName
+        )
+    )
+
+  if (modulesToAdd.length === 0) {
     return groups
   }
 
-  return [...groups, MY_LEAVES_GROUP]
+  return [...groups, ...modulesToAdd]
 }
 
 function sortSidebarGroups(

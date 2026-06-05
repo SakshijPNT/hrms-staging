@@ -11,6 +11,7 @@ import { RolesPage } from './pages/Roles'
 import { UsersPage } from './pages/Users'
 import { MyApplicationsPage } from './pages/MyApplications'
 import { MyLeavesPage } from './pages/MyLeaves'
+import { MyApprovalPage } from './pages/MyApproval'
 import { CompanyPage } from './pages/Company'
 import  { PolicyPage } from './pages/Policy'
 
@@ -59,6 +60,11 @@ function App() {
         <Route
           path="/my-leaves"
           element={<MyLeavesPage />}
+        />
+
+        <Route
+          path="/my-approval"
+          element={<MyApprovalPage />}
         />
 
         {/* Company */}
