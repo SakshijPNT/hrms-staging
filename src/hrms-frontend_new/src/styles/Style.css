@@ -116,6 +116,7 @@ user-select: none;
 input:not([type='checkbox']):not([type='radio']):not([readonly]):not(:disabled),
 textarea:not([readonly]):not(:disabled),
 .act-search:not([readonly]):not(:disabled) {
+  -webkit-user-select: text;
   user-select: text;
   cursor: text;
 }
@@ -215,7 +216,7 @@ user-select: none;
 .act-page-header {
   display: flex;
 
-  justify-content: space-between;
+  justify-content: flex-end;
 
   align-items: center;
 
@@ -349,7 +350,8 @@ user-select: none;
   inset: 0;
 
   background: rgba(15, 23, 42, 0.45);
-
+  
+  -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(2px);
 
   display: flex;
@@ -2959,100 +2961,6 @@ user-select: none;
   color: #991b1b;
 }
 
-.act-status.cancelled {
-  background: #e5e7eb;
-  color: #374151;
-}
-
-.act-header-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.act-link-btn {
-  color: var(--primary);
-  text-decoration: none;
-  font-size: 14px;
-  font-weight: 500;
-  padding: 8px 4px;
-}
-
-.act-link-btn:hover {
-  text-decoration: underline;
-}
-
-.act-tab-bar {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 20px;
-}
-
-.act-tab {
-  background: #f3f4f6;
-  border: 1px solid #e5e7eb;
-  color: #374151;
-  padding: 8px 16px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 14px;
-}
-
-.act-tab.active {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: #fff;
-}
-
-.reg-modal {
-  max-width: 640px;
-}
-
-.reg-readonly-block {
-  margin-bottom: 16px;
-}
-
-.reg-readonly-label {
-  display: block;
-  font-size: 14px;
-  font-weight: 600;
-  margin-bottom: 8px;
-  color: #374151;
-}
-
-.reg-readonly-hint {
-  font-size: 13px;
-  color: #6b7280;
-  margin: 0 0 12px;
-}
-
-.reg-time-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
-.reg-action-group {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.reg-action-btn {
-  padding: 6px 12px;
-  font-size: 13px;
-}
-
-@media (max-width: 768px) {
-  .reg-time-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .act-header-actions {
-    width: 100%;
-    justify-content: flex-start;
-  }
 /* my leaves */
 .leaves-stats {
   margin-bottom: 18px;
@@ -3369,9 +3277,8 @@ user-select: none;
 }
 
 .halfday-radio input[type='radio'] {
-  
-  -webkit-appearance: none;
   appearance: none;
+  -webkit-appearance: none;
 
   width: 18px !important;
   height: 18px !important;
@@ -3435,5 +3342,4 @@ user-select: none;
 .disabled-date-icon {
   opacity: 0.45;
   cursor: not-allowed;
-}
 }
