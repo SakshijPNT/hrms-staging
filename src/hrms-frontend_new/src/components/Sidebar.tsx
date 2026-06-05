@@ -122,7 +122,34 @@ const moduleRoutes: Record<
   },
 }
 
+function sortSidebarGroups(
+  groups: ModuleGroup[]
+): ModuleGroup[] {
+  const getOrder = (group: ModuleGroup): number => {
+    if (group.groupName === 'Settings') {
+      return Number.MAX_SAFE_INTEGER
+    }
 
+    if (
+      group.modules.length === 1 &&
+      group.modules[0].moduleName === 'Dashboard'
+    ) {
+      return 0
+    }
+
+    return 1
+  }
+
+  return [...groups].sort((a, b) => {
+    const orderDiff = getOrder(a) - getOrder(b)
+
+    if (orderDiff !== 0) {
+      return orderDiff
+    }
+
+    return groups.indexOf(a) - groups.indexOf(b)
+  })
+}
 
 export default function Sidebar({
 
@@ -175,7 +202,7 @@ export default function Sidebar({
         {/* MENU */}
         <nav className="sidebar-menu">
 
-          {groups.map((group) => {
+          {sortSidebarGroups(groups).map((group) => {
 
             const hasChildren =
               group.modules.length > 1
