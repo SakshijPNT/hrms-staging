@@ -1,21 +1,36 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
   useState,
-  type FormEvent,
 } from 'react'
 import Layout from './Layout'
 import '../styles/Style.css'
 import Select from 'react-select'
-import DatePicker from 'react-datepicker'
-import 'react-datepicker/dist/react-datepicker.css'
-import { FiCalendar, FiEye, FiTrash2 } from 'react-icons/fi'
+import { FiEye, FiTrash2 } from 'react-icons/fi'
 import { MdEdit } from 'react-icons/md'
 
+import api from '../services/api'
+import {
+  ApplyLeaveModal,
+  type LeaveApplicationEditData,
+} from '../components/ApplyLeaveModal'
+import {
+  LeaveRequestViewModal,
+  type LeaveRequestDetail,
+} from '../components/LeaveRequestViewModal'
+import {
+  LeaveBalanceDetailModal,
+  type LeaveBalanceDetail,
+} from '../components/LeaveBalanceDetailModal'
+import { normalizeDate } from '../utils/attendanceFormat'
+import type { AxiosError } from 'axios'
+
 interface LeaveBalanceCard {
-  id: string
+  leaveTypeId: number
   leaveTypeName: string
-  total: number
+  totalAnnual: number
+  monthlyLeave: number
   used: number
   pending: number
 }
@@ -26,110 +41,26 @@ interface LeaveRequest {
   startDate: string
   endDate: string
   requestNote: string
-  status: 'Approve' | 'Reject' | 'Pending'
+  status: 'Approve' | 'Reject' | 'Pending' | 'Cancelled'
   managerNote: string
 }
 
-const DUMMY_LEAVE_BALANCES: LeaveBalanceCard[] = [
-  {
-    id: 'casual',
-    leaveTypeName: 'Casual Leave',
-    total: 12,
-    used: 4,
-    pending: 8,
-  },
-  {
-    id: 'sick',
-    leaveTypeName: 'Sick Leave',
-    total: 12,
-    used: 4,
-    pending: 8,
-  },
-  {
-    id: 'paid',
-    leaveTypeName: 'Paid Leave',
-    total: 12,
-    used: 4,
-    pending: 8,
-  },
-]
-
-const DUMMY_LEAVE_REQUESTS: LeaveRequest[] = [
-  {
-    id: 1,
-    requestType: 'Paid Leave',
-    startDate: '13/07/2026',
-    endDate: '13/07/2026',
-    requestNote: 'Out of Town',
-    status: 'Approve',
-    managerNote: '-- --',
-  },
-  {
-    id: 2,
-    requestType: 'Paid Leave',
-    startDate: '13/07/2026',
-    endDate: '13/07/2026',
-    requestNote: 'Not feeling well',
-    status: 'Reject',
-    managerNote: 'Client Meeting',
-  },
-  {
-    id: 3,
-    requestType: 'Casual Leave',
-    startDate: '13/07/2026',
-    endDate: '13/07/2026',
-    requestNote: 'Out of Town',
-    status: 'Pending',
-    managerNote: '-- --',
-  },
-  {
-    id: 4,
-    requestType: 'Sick Leave',
-    startDate: '13/07/2026',
-    endDate: '13/07/2026',
-    requestNote: 'Not feeling well',
-    status: 'Approve',
-    managerNote: '-- --',
-  },
-  {
-    id: 5,
-    requestType: 'Paid Leave',
-    startDate: '13/07/2026',
-    endDate: '13/07/2026',
-    requestNote: 'Out of Town',
-    status: 'Reject',
-    managerNote: 'Client Meeting',
-  },
-  {
-    id: 6,
-    requestType: 'Casual Leave',
-    startDate: '13/07/2026',
-    endDate: '13/07/2026',
-    requestNote: 'Out of Town',
-    status: 'Pending',
-    managerNote: '-- --',
-  },
-  {
-    id: 7,
-    requestType: 'Sick Leave',
-    startDate: '13/07/2026',
-    endDate: '13/07/2026',
-    requestNote: 'Not feeling well',
-    status: 'Approve',
-    managerNote: '-- --',
-  },
-]
-
-const LEAVE_TYPE_OPTIONS = [
-  { value: 'casual', label: 'Casual Leave' },
-  { value: 'sick', label: 'Sick Leave' },
-  { value: 'paid', label: 'Paid Leave' },
-]
-
-const TYPE_FILTER_OPTIONS = [
-  { value: 'all', label: 'All Type' },
-  ...LEAVE_TYPE_OPTIONS,
-]
+interface ApiLeaveApplication {
+  id: number
+  leaveTypeId: number
+  leaveTypeName: string
+  fromDate: string
+  toDate: string
+  totalDays: number
+  isHalfDay: boolean
+  session: string | null
+  reason: string | null
+  approvalStatus: string
+  approverEmailId: string | null
+  approverRemark: string | null
+  approvedOn: string | null
+  createdOn: string
+}
 
 const STATUS_FILTER_OPTIONS = [
   { value: 'all', label: 'All Status' },
@@ -138,33 +69,196 @@ const STATUS_FILTER_OPTIONS = [
   { value: 'pending', label: 'Pending' },
 ]
 
+function formatDisplayDate(value: string): string {
+  const normalized = normalizeDate(value)
+  if (!normalized) {
+    return value
+  }
+
+  const [year, month, day] = normalized.split('-')
+  return `${day}/${month}/${year}`
+}
+
+function mapApprovalStatus(
+  status: string,
+): LeaveRequest['status'] {
+  switch (status.toUpperCase()) {
+    case 'APPROVED':
+      return 'Approve'
+    case 'REJECTED':
+      return 'Reject'
+    case 'CANCELLED':
+      return 'Cancelled'
+    default:
+      return 'Pending'
+  }
+}
+
+function mapApplication(item: ApiLeaveApplication): LeaveRequest {
+  return {
+    id: item.id,
+    requestType: item.leaveTypeName,
+    startDate: formatDisplayDate(item.fromDate),
+    endDate: formatDisplayDate(item.toDate),
+    requestNote: item.reason?.trim() || '-- --',
+    status: mapApprovalStatus(item.approvalStatus),
+    managerNote: item.approverRemark?.trim() || '-- --',
+  }
+}
+
+function toViewDetail(item: ApiLeaveApplication): LeaveRequestDetail {
+  return {
+    id: item.id,
+    leaveTypeName: item.leaveTypeName,
+    startDate: formatDisplayDate(item.fromDate),
+    endDate: formatDisplayDate(item.toDate),
+    totalDays: Number(item.totalDays),
+    isHalfDay: item.isHalfDay,
+    session: item.session,
+    requestNote: item.reason?.trim() || '-- --',
+    status: mapApprovalStatus(item.approvalStatus),
+    managerNote: item.approverRemark?.trim() || '-- --',
+    approverEmailId: item.approverEmailId,
+    approvedOn: item.approvedOn,
+    createdOn: item.createdOn,
+  }
+}
+
+function toEditData(item: ApiLeaveApplication): LeaveApplicationEditData {
+  return {
+    id: item.id,
+    leaveTypeId: item.leaveTypeId,
+    fromDate: normalizeDate(item.fromDate),
+    toDate: normalizeDate(item.toDate),
+    isHalfDay: item.isHalfDay,
+    session: item.session,
+    reason: item.reason,
+  }
+}
+
+function canModifyApplication(item: ApiLeaveApplication) {
+  if (item.approvalStatus.toUpperCase() !== 'PENDING') {
+    return false
+  }
+
+  const fromDate = normalizeDate(item.fromDate)
+  if (!fromDate) {
+    return false
+  }
+
+  const today = new Date().toISOString().slice(0, 10)
+  return fromDate > today
+}
+
 export function MyLeavesPage() {
-  const [leaveRequests, setLeaveRequests] =
-    useState<LeaveRequest[]>(DUMMY_LEAVE_REQUESTS)
+  const [leaveBalances, setLeaveBalances] = useState<LeaveBalanceCard[]>([])
+  const [balancesLoading, setBalancesLoading] = useState(true)
+  const [leaveApplications, setLeaveApplications] = useState<
+    ApiLeaveApplication[]
+  >([])
+  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([])
+  const [requestsLoading, setRequestsLoading] = useState(true)
 
   const [typeFilter, setTypeFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
   const [currentPage, setCurrentPage] = useState(1)
   const [modalOpen, setModalOpen] = useState(false)
-  const [error, setError] = useState('')
-
-  const [form, setForm] = useState({
-    leaveType: '',
-    startDate: '',
-    endDate: '',
-    requestNote: '',
-  })
-
-  const [isStartDateOpen, setIsStartDateOpen] =
-    useState(false)
-
-  const [isEndDateOpen, setIsEndDateOpen] =
-    useState(false)
+  const [editApplication, setEditApplication] =
+    useState<LeaveApplicationEditData | null>(null)
+  const [viewRequest, setViewRequest] = useState<LeaveRequestDetail | null>(
+    null,
+  )
+  const [actionId, setActionId] = useState<number | null>(null)
+  const [balanceDetailOpen, setBalanceDetailOpen] = useState(false)
+  const [balanceDetailLoading, setBalanceDetailLoading] = useState(false)
+  const [balanceDetailError, setBalanceDetailError] = useState('')
+  const [balanceDetail, setBalanceDetail] =
+    useState<LeaveBalanceDetail | null>(null)
 
   const rowsPerPage = 10
 
+  const typeFilterOptions = useMemo(() => {
+    const uniqueTypes = Array.from(
+      new Set(leaveRequests.map((request) => request.requestType)),
+    ).sort((a, b) => a.localeCompare(b))
+
+    return [
+      { value: 'all', label: 'All Type' },
+      ...uniqueTypes.map((leaveTypeName) => ({
+        value: leaveTypeName.toLowerCase(),
+        label: leaveTypeName,
+      })),
+    ]
+  }, [leaveRequests])
+
+  const fetchLeaveApplications = useCallback(async () => {
+    setRequestsLoading(true)
+
+    try {
+      const response = await api.get<ApiLeaveApplication[]>(
+        '/user-leaves/applications',
+      )
+      const items = response.data ?? []
+      setLeaveApplications(items)
+      setLeaveRequests(items.map(mapApplication))
+    } catch (fetchError) {
+      console.error('Failed to fetch leave applications', fetchError)
+      setLeaveApplications([])
+      setLeaveRequests([])
+    } finally {
+      setRequestsLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
-    if (modalOpen) {
+    void fetchLeaveBalances()
+    void fetchLeaveApplications()
+  }, [fetchLeaveApplications])
+
+  async function fetchLeaveBalances() {
+    setBalancesLoading(true)
+
+    try {
+      const response = await api.get<
+        {
+          leaveTypeId: number
+          leaveTypeName: string
+          totalAnnual: number
+          monthlyLeave: number
+          used: number
+          pending: number
+        }[]
+      >('/user-leaves/balances')
+
+      setLeaveBalances(
+        (response.data ?? []).map((item) => ({
+          leaveTypeId: item.leaveTypeId,
+          leaveTypeName: item.leaveTypeName,
+          totalAnnual: Number(item.totalAnnual),
+          monthlyLeave: Number(item.monthlyLeave),
+          used: Number(item.used),
+          pending: Number(item.pending),
+        }))
+      )
+    } catch (fetchError) {
+      console.error('Failed to fetch leave balances', fetchError)
+      setLeaveBalances([])
+    } finally {
+      setBalancesLoading(false)
+    }
+  }
+
+  function formatLeaveDays(value: number) {
+    const rounded = Math.round(value * 100) / 100
+    if (Number.isInteger(rounded)) {
+      return String(rounded).padStart(2, '0')
+    }
+
+    return rounded.toFixed(2)
+  }
+
+  useEffect(() => {
+    if (modalOpen || balanceDetailOpen || viewRequest) {
       document.body.style.overflow = 'hidden'
     } else {
       document.body.style.overflow = 'auto'
@@ -173,7 +267,7 @@ export function MyLeavesPage() {
     return () => {
       document.body.style.overflow = 'auto'
     }
-  }, [modalOpen])
+  }, [modalOpen, balanceDetailOpen, viewRequest])
 
   useEffect(() => {
     setCurrentPage(1)
@@ -207,84 +301,113 @@ export function MyLeavesPage() {
     indexOfLastRow
   )
 
-  const selectedLeaveType =
-    LEAVE_TYPE_OPTIONS.find(
-      (option) => option.value === form.leaveType
-    ) || null
-
   function openModal() {
-    setForm({
-      leaveType: '',
-      startDate: '',
-      endDate: '',
-      requestNote: '',
-    })
-    setError('')
+    setEditApplication(null)
     setModalOpen(true)
   }
 
   function closeModal() {
     setModalOpen(false)
-    setError('')
+    setEditApplication(null)
   }
 
-  function formatRequestDate(date: Date | null) {
-    if (!date) return ''
-
-    const day = String(date.getDate()).padStart(2, '0')
-    const month = String(date.getMonth() + 1).padStart(2, '0')
-    const year = date.getFullYear()
-
-    return `${day}/${month}/${year}`
-  }
-
-  function parseDisplayDate(dateStr: string) {
-    if (!dateStr) return null
-
-    const [day, month, year] = dateStr
-      .split('/')
-      .map(Number)
-
-    return new Date(year, month - 1, day)
-  }
-
-  function handleSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-
-    if (
-      !form.leaveType ||
-      !form.startDate ||
-      !form.endDate
-    ) {
-      setError('Please fill all required fields.')
+  function openViewModal(applicationId: number) {
+    const item = leaveApplications.find((entry) => entry.id === applicationId)
+    if (!item) {
       return
     }
 
-    const leaveLabel =
-      LEAVE_TYPE_OPTIONS.find(
-        (option) => option.value === form.leaveType
-      )?.label || 'Leave'
+    setViewRequest(toViewDetail(item))
+  }
 
-    const newRequest: LeaveRequest = {
-      id: leaveRequests.length + 1,
-      requestType: leaveLabel,
-      startDate: form.startDate,
-      endDate: form.endDate,
-      requestNote: form.requestNote || '-- --',
-      status: 'Pending',
-      managerNote: '-- --',
+  function closeViewModal() {
+    setViewRequest(null)
+  }
+
+  function openEditModal(applicationId: number) {
+    const item = leaveApplications.find((entry) => entry.id === applicationId)
+    if (!item || !canModifyApplication(item)) {
+      return
     }
 
-    setLeaveRequests((current) => [
-      newRequest,
-      ...current,
-    ])
+    setEditApplication(toEditData(item))
+    setModalOpen(true)
+  }
 
-    alert('Leave request submitted successfully')
-    closeModal()
+  async function handleDeleteApplication(applicationId: number) {
+    const item = leaveApplications.find((entry) => entry.id === applicationId)
+    if (!item || !canModifyApplication(item)) {
+      return
+    }
+
+    if (
+      !window.confirm(
+        'Delete this leave request? This action cannot be undone.',
+      )
+    ) {
+      return
+    }
+
+    setActionId(applicationId)
+
+    try {
+      await api.delete(`/user-leaves/applications/${applicationId}`)
+      await fetchLeaveApplications()
+      await fetchLeaveBalances()
+    } catch (err) {
+      const axiosError = err as AxiosError<{ message?: string }>
+      const message =
+        axiosError.response?.data?.message ??
+        'Failed to delete leave request.'
+      window.alert(message)
+    } finally {
+      setActionId(null)
+    }
+  }
+
+  async function openBalanceDetail(leaveTypeId: number) {
+    setBalanceDetailOpen(true)
+    setBalanceDetailLoading(true)
+    setBalanceDetailError('')
+    setBalanceDetail(null)
+
+    try {
+      const response = await api.get<{
+        leaveTypeId: number
+        leaveTypeName: string
+        annualUsed: number
+        annualPending: number
+        monthlyUsed: number
+        monthlyPending: number
+      }>(`/user-leaves/balances/${leaveTypeId}/detail`)
+
+      setBalanceDetail({
+        leaveTypeId: response.data.leaveTypeId,
+        leaveTypeName: response.data.leaveTypeName,
+        annualUsed: Number(response.data.annualUsed),
+        annualPending: Number(response.data.annualPending),
+        monthlyUsed: Number(response.data.monthlyUsed),
+        monthlyPending: Number(response.data.monthlyPending),
+      })
+    } catch (fetchError) {
+      console.error('Failed to fetch leave balance detail', fetchError)
+      setBalanceDetailError('Unable to load leave balance details.')
+    } finally {
+      setBalanceDetailLoading(false)
+    }
+  }
+
+  function closeBalanceDetail() {
+    setBalanceDetailOpen(false)
+    setBalanceDetailError('')
+    setBalanceDetail(null)
   }
 
   function getStatusClass(status: LeaveRequest['status']) {
+    if (status === 'Cancelled') {
+      return 'reject'
+    }
+
     return status.toLowerCase()
   }
 
@@ -292,29 +415,56 @@ export function MyLeavesPage() {
     <Layout title="My Leaves">
       <div className="act-page">
         <div className="act-stats leaves-stats">
-          {DUMMY_LEAVE_BALANCES.map((leave) => (
-            <div
-              key={leave.id}
-              className={`act-leave-card ${leave.id}`}
-            >
-              <div className="act-leave-card-content">
-                <h3>
-                  {leave.leaveTypeName}:{' '}
-                  <span className="act-leave-card-total">
-                    {leave.total}
-                  </span>
-                </h3>
+          {balancesLoading ? (
+            <div className="act-leave-card leaves-stats-loading">
+              Loading leave balances...
+            </div>
+          ) : leaveBalances.length === 0 ? (
+            <div className="act-leave-card leaves-stats-empty">
+              No leave types configured for your company.
+            </div>
+          ) : (
+            leaveBalances.map((leave) => (
+              <div
+                key={leave.leaveTypeId}
+                className="act-leave-card"
+              >
+                <div className="act-leave-card-content">
+                  <h3>
+                    {leave.leaveTypeName}:{' '}
+                    <span className="act-leave-card-total">
+                      {formatLeaveDays(leave.totalAnnual)}
+                    </span>
+                  </h3>
 
-                <div className="act-leave-card-meta">
-                  <span>Used: {String(leave.used).padStart(2, '0')}</span>
-                  <span>
-                    Pending:{' '}
-                    {String(leave.pending).padStart(2, '0')}
-                  </span>
+                  <p className="act-leave-card-monthly">
+                    Monthly: {formatLeaveDays(leave.monthlyLeave)}
+                  </p>
+
+                  <div className="act-leave-card-meta">
+                    <button
+                      type="button"
+                      className="act-leave-card-stat-btn"
+                      onClick={() =>
+                        void openBalanceDetail(leave.leaveTypeId)
+                      }
+                    >
+                      Used: {formatLeaveDays(leave.used)}
+                    </button>
+                    <button
+                      type="button"
+                      className="act-leave-card-stat-btn"
+                      onClick={() =>
+                        void openBalanceDetail(leave.leaveTypeId)
+                      }
+                    >
+                      Pending: {formatLeaveDays(leave.pending)}
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
 
         <div className="act-toolbar leaves-toolbar">
@@ -326,12 +476,11 @@ export function MyLeavesPage() {
                 menuPlacement="auto"
                 menuShouldScrollIntoView={false}
                 classNamePrefix="act-select"
-                options={TYPE_FILTER_OPTIONS}
+                options={typeFilterOptions}
                 value={
-                  TYPE_FILTER_OPTIONS.find(
-                    (option) =>
-                      option.value === typeFilter
-                  ) || TYPE_FILTER_OPTIONS[0]
+                  typeFilterOptions.find(
+                    (option) => option.value === typeFilter
+                  ) || typeFilterOptions[0]
                 }
                 onChange={(selected) =>
                   setTypeFilter(
@@ -388,7 +537,13 @@ export function MyLeavesPage() {
             </thead>
 
             <tbody>
-              {filteredRequests.length === 0 ? (
+              {requestsLoading ? (
+                <tr>
+                  <td colSpan={7} className="act-empty">
+                    Loading leave requests...
+                  </td>
+                </tr>
+              ) : filteredRequests.length === 0 ? (
                 <tr>
                   <td
                     colSpan={7}
@@ -398,7 +553,15 @@ export function MyLeavesPage() {
                   </td>
                 </tr>
               ) : (
-                currentRows.map((request) => (
+                currentRows.map((request) => {
+                  const application = leaveApplications.find(
+                    (entry) => entry.id === request.id,
+                  )
+                  const canModify = application
+                    ? canModifyApplication(application)
+                    : false
+
+                  return (
                   <tr key={request.id}>
                     <td>{request.requestType}</td>
                     <td>{request.startDate}</td>
@@ -419,6 +582,7 @@ export function MyLeavesPage() {
                           className="leave-table-action-btn"
                           title="View request"
                           aria-label={`View leave request ${request.id}`}
+                          onClick={() => openViewModal(request.id)}
                         >
                           <FiEye />
                         </button>
@@ -428,6 +592,8 @@ export function MyLeavesPage() {
                           className="leave-table-action-btn"
                           title="Edit request"
                           aria-label={`Edit leave request ${request.id}`}
+                          disabled={!canModify || actionId === request.id}
+                          onClick={() => openEditModal(request.id)}
                         >
                           <MdEdit />
                         </button>
@@ -437,18 +603,23 @@ export function MyLeavesPage() {
                           className="leave-table-action-btn"
                           title="Delete request"
                           aria-label={`Delete leave request ${request.id}`}
+                          disabled={!canModify || actionId === request.id}
+                          onClick={() =>
+                            void handleDeleteApplication(request.id)
+                          }
                         >
                           <FiTrash2 />
                         </button>
                       </div>
                     </td>
                   </tr>
-                ))
+                  )
+                })
               )}
             </tbody>
           </table>
 
-          {filteredRequests.length > 0 && (
+          {!requestsLoading && filteredRequests.length > 0 && (
             <div className="role-pagination">
               <div className="pagination-info">
                 Showing {currentRows.length} of{' '}
@@ -488,190 +659,30 @@ export function MyLeavesPage() {
           )}
         </div>
 
-        {modalOpen && (
-          <div
-            className="act-modal-overlay"
-            onClick={closeModal}
-          >
-            <div
-              className="act-modal modal-sm"
-              onClick={(e) =>
-                e.stopPropagation()
-              }
-            >
-              <div className="act-modal-header">
-                <h2>Leave Request</h2>
+        <ApplyLeaveModal
+          open={modalOpen}
+          onClose={closeModal}
+          editApplication={editApplication}
+          onSuccess={() => {
+            void fetchLeaveApplications()
+            void fetchLeaveBalances()
+          }}
+        />
 
-                <button
-                  type="button"
-                  className="act-modal-close"
-                  onClick={closeModal}
-                >
-                  &times;
-                </button>
-              </div>
+        <LeaveRequestViewModal
+          open={viewRequest !== null}
+          request={viewRequest}
+          onClose={closeViewModal}
+        />
 
-              <form
-                id="leave-request-form"
-                className="act-modal-form"
-                onSubmit={handleSubmit}
-              >
-                {/* <h3 className="act-form-section-title">
-                  Basic Details
-                </h3> */}
-
-                <div className="act-form-row">
-                  <label className="act-form-field">
-                    <span>Leave Type *</span>
-
-                    <Select
-                      menuPortalTarget={document.body}
-                      menuPosition="fixed"
-                      menuPlacement="auto"
-                      menuShouldScrollIntoView={false}
-                      classNamePrefix="act-select"
-                      options={LEAVE_TYPE_OPTIONS}
-                      placeholder="-Select-"
-                      value={selectedLeaveType}
-                      onChange={(selected) =>
-                        setForm((current) => ({
-                          ...current,
-                          leaveType: selected
-                            ? String(selected.value)
-                            : '',
-                        }))
-                      }
-                    />
-                  </label>
-                </div>
-
-                <div className="act-form-row">
-                  <label className="act-form-field">
-                    <span>Start Date *</span>
-
-                    <div className="act-date-picker-wrapper">
-                      <DatePicker
-                        selected={parseDisplayDate(
-                          form.startDate
-                        )}
-                        onChange={(date: Date | null) => {
-                          setForm((current) => ({
-                            ...current,
-                            startDate:
-                              formatRequestDate(date),
-                          }))
-                          setIsStartDateOpen(false)
-                        }}
-                        onInputClick={() =>
-                          setIsStartDateOpen(true)
-                        }
-                        open={isStartDateOpen}
-                        onClickOutside={() =>
-                          setIsStartDateOpen(false)
-                        }
-                        placeholderText="-Select-"
-                        dateFormat="dd/MM/yyyy"
-                        className="act-date-picker"
-                        popperClassName="act-datepicker-popper"
-                        portalId="root"
-                        popperPlacement="bottom-start"
-                      />
-
-                      <FiCalendar
-                        className="act-date-icon"
-                        onClick={() =>
-                          setIsStartDateOpen((prev) => !prev)
-                        }
-                      />
-                    </div>
-                  </label>
-
-                  <label className="act-form-field">
-                    <span>End Date *</span>
-
-                    <div className="act-date-picker-wrapper">
-                      <DatePicker
-                        selected={parseDisplayDate(
-                          form.endDate
-                        )}
-                        onChange={(date: Date | null) => {
-                          setForm((current) => ({
-                            ...current,
-                            endDate:
-                              formatRequestDate(date),
-                          }))
-                          setIsEndDateOpen(false)
-                        }}
-                        onInputClick={() =>
-                          setIsEndDateOpen(true)
-                        }
-                        open={isEndDateOpen}
-                        onClickOutside={() =>
-                          setIsEndDateOpen(false)
-                        }
-                        placeholderText="-Select-"
-                        dateFormat="dd/MM/yyyy"
-                        className="act-date-picker"
-                        popperClassName="act-datepicker-popper"
-                        portalId="root"
-                        popperPlacement="bottom-start"
-                      />
-
-                      <FiCalendar
-                        className="act-date-icon"
-                        onClick={() =>
-                          setIsEndDateOpen((prev) => !prev)
-                        }
-                      />
-                    </div>
-                  </label>
-                </div>
-
-                <div className="act-form-row">
-                  <label className="act-form-field">
-                    <span>Request Note</span>
-
-                    <textarea
-                      rows={4}
-                      placeholder="-Enter Text-"
-                      value={form.requestNote}
-                      onChange={(e) =>
-                        setForm((current) => ({
-                          ...current,
-                          requestNote: e.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-                </div>
-
-                {error && (
-                  <div className="form-error">
-                    {error}
-                  </div>
-                )}
-              </form>
-
-              <div className="act-modal-actions">
-                <button
-                  type="button"
-                  className="act-cancel-btn"
-                  onClick={closeModal}
-                >
-                  Cancel
-                </button>
-
-                <button
-                  type="submit"
-                  form="leave-request-form"
-                  className="act-submit-btn"
-                >
-                  Submit
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        <LeaveBalanceDetailModal
+          open={balanceDetailOpen}
+          loading={balanceDetailLoading}
+          error={balanceDetailError}
+          detail={balanceDetail}
+          onClose={closeBalanceDetail}
+          formatLeaveDays={formatLeaveDays}
+        />
       </div>
     </Layout>
   )

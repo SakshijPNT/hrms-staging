@@ -1,14 +1,12 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+namespace Hrms.NewApi.Dtos;
 
-namespace Hrms.NewApi.Dtos
+public class UserLeaveBalanceDTO
 {
-    public class UserLeaveBalanceDTO
-    {
-        public int LeaveTypeId { get; set; }
-        public string LeaveTypeName { get; set; }
-        public decimal AvailableBalance { get; set; }
-    }
+    public int LeaveTypeId { get; set; }
+    public string LeaveTypeName { get; set; } = null!;
+    public decimal TotalAnnual { get; set; }
+    public decimal MonthlyLeave { get; set; }
+    public decimal Used { get; set; }
+    public decimal Pending { get; set; }
+    public decimal AvailableBalance { get; set; }
 }

@@ -99,6 +99,35 @@ public class AttendanceController : ControllerBase
         return Ok(response);
     }
 
+    [HttpGet("monthly-log/{year:int}/{month:int}")]
+    public async Task<IActionResult> GetMonthlyAttendanceLog(
+        int year,
+        int month,
+        CancellationToken cancellationToken)
+    {
+        var session = GetSessionInfo();
+
+        if (session is null)
+        {
+            return Unauthorized(new { message = "No active session." });
+        }
+
+        try
+        {
+            var response = await _calendarManager.GetMonthlyAttendanceLogAsync(
+                session.UserId,
+                year,
+                month,
+                cancellationToken);
+
+            return Ok(response);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     [HttpGet("calendar/{year:int}/{month:int}")]
     public async Task<IActionResult> GetMonthlyCalendar(
         int year,

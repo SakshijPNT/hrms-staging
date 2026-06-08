@@ -3,12 +3,9 @@ import '../styles/Style.css'
 import api from '../services/api'
 import Layout from '../pages/Layout'
 import type { AxiosError } from 'axios'
-import { FiSearch } from 'react-icons/fi'
+import { FiSearch, FiEye } from 'react-icons/fi'
 import { MdEdit } from "react-icons/md";
 import Select from 'react-select'
-import HolidayInlineEditor, {
-  type HolidayRow,
-} from '../components/HolidayInlineEditor'
 
 interface CompanyItem {
   id: number
@@ -21,7 +18,41 @@ interface CompanyItem {
   country: string | null
   pincode: string | null
   timezone: string
+  fiscalYearStartMonth: number
+  fiscalYearStartDay: number
   statusCode: number
+}
+
+interface TimezoneOption {
+  value: string
+  label: string
+}
+
+const DEFAULT_TIMEZONE = 'Asia/Kolkata'
+const DEFAULT_FISCAL_START_MONTH = 4
+const DEFAULT_FISCAL_START_DAY = 1
+
+const FISCAL_MONTH_OPTIONS = [
+  { value: 1, label: 'January' },
+  { value: 2, label: 'February' },
+  { value: 3, label: 'March' },
+  { value: 4, label: 'April' },
+  { value: 5, label: 'May' },
+  { value: 6, label: 'June' },
+  { value: 7, label: 'July' },
+  { value: 8, label: 'August' },
+  { value: 9, label: 'September' },
+  { value: 10, label: 'October' },
+  { value: 11, label: 'November' },
+  { value: 12, label: 'December' },
+]
+
+type CompanyFieldErrors = {
+  companyName?: string
+  companyCode?: string
+  timezone?: string
+  fiscalYearStartMonth?: string
+  fiscalYearStartDay?: string
 }
 
 export function CompanyPage() {
@@ -38,8 +69,13 @@ export function CompanyPage() {
   const [editingCompanyId, setEditingCompanyId] =
     useState<number | null>(null)
 
+  const [isViewMode, setIsViewMode] = useState(false)
+
   const [error, setError] =
     useState('')
+
+  const [fieldErrors, setFieldErrors] =
+    useState<CompanyFieldErrors>({})
 
 const [hasCompanyAccess, setHasCompanyAccess] =
   useState(false)
@@ -53,24 +89,17 @@ const [hasCompanyAccess, setHasCompanyAccess] =
     state: '',
     country: '',
     pincode: '',
-    timezone: 'Asia/Kolkata',
+    timezone: DEFAULT_TIMEZONE,
+    fiscalYearStartMonth: DEFAULT_FISCAL_START_MONTH,
+    fiscalYearStartDay: DEFAULT_FISCAL_START_DAY,
     statusCode: 1,
   })
 
-  const [holidays, setHolidays] = useState<HolidayRow[]>([])
-
-  const timezones = [
-    'Asia/Kolkata',
-    'UTC',
-    'America/New_York',
-    'Europe/London',
-    'Asia/Dubai',
-    'Asia/Singapore',
-  ]
+  const [timezoneOptions, setTimezoneOptions] = useState<TimezoneOption[]>([])
 
   const [currentPage, setCurrentPage] = useState(1)
 
-  const companiesPerPage = 5
+  const companiesPerPage = 10
 
   const indexOfLastCompany =
     currentPage * companiesPerPage
@@ -97,6 +126,40 @@ const [hasCompanyAccess, setHasCompanyAccess] =
     }
   }
 
+  async function fetchTimezones() {
+    try {
+      const response = await api.get<
+        { value: string; label: string }[]
+      >('/Company/timezones')
+
+      setTimezoneOptions(
+        (response.data ?? []).map((option) => ({
+          value: option.value,
+          label: option.label,
+        }))
+      )
+    } catch (fetchError) {
+      console.error('Failed to fetch timezones', fetchError)
+      setTimezoneOptions([])
+    }
+  }
+
+  function buildTimezoneSelectOptions(currentValue?: string) {
+    const options = [...timezoneOptions]
+
+    if (
+      currentValue &&
+      !options.some((option) => option.value === currentValue)
+    ) {
+      options.unshift({
+        value: currentValue,
+        label: currentValue,
+      })
+    }
+
+    return options
+  }
+
             useEffect(() => {
             async function loadCompanies() {
               try {
@@ -113,6 +176,8 @@ const [hasCompanyAccess, setHasCompanyAccess] =
                   ) || false
 
                 setHasCompanyAccess(hasA0)
+
+                await fetchTimezones()
 
                 const response = await api.get(
                   '/Company/GetCompanies'
@@ -146,18 +211,20 @@ const [hasCompanyAccess, setHasCompanyAccess] =
 
     const q = search.toLowerCase()
 
-    return companies.filter(
-      (company) =>
-        company.companyName
-          .toLowerCase()
-          .includes(q) ||
-        company.companyCode
-          .toLowerCase()
-          .includes(q) ||
-        company.country
-          ?.toLowerCase()
-          .includes(q)
-    )
+    return companies
+      .filter(
+        (company) =>
+          company.companyName
+            .toLowerCase()
+            .includes(q) ||
+          company.companyCode
+            .toLowerCase()
+            .includes(q) ||
+          company.country
+            ?.toLowerCase()
+            .includes(q)
+      )
+      .sort((a, b) => a.id - b.id)
 
   }, [companies, search])
 
@@ -175,6 +242,7 @@ const [hasCompanyAccess, setHasCompanyAccess] =
   function openModal() {
 
     setEditingCompanyId(null)
+    setIsViewMode(false)
 
     setForm({
       companyName: '',
@@ -185,24 +253,73 @@ const [hasCompanyAccess, setHasCompanyAccess] =
       state: '',
       country: '',
       pincode: '',
-      timezone: 'Asia/Kolkata',
+      timezone: DEFAULT_TIMEZONE,
+      fiscalYearStartMonth: DEFAULT_FISCAL_START_MONTH,
+      fiscalYearStartDay: DEFAULT_FISCAL_START_DAY,
       statusCode: 1,
     })
 
-    setHolidays([])
-
     setError('')
+    setFieldErrors({})
 
     setModalOpen(true)
   }
 
   function closeModal() {
     setModalOpen(false)
+    setIsViewMode(false)
+    setFieldErrors({})
   }
 
-  function handleEdit(company: CompanyItem) {
+  function clearFieldError(field: keyof CompanyFieldErrors) {
+    setFieldErrors((prev) => {
+      if (!prev[field]) {
+        return prev
+      }
 
-    setEditingCompanyId(company.id)
+      const next = { ...prev }
+      delete next[field]
+      return next
+    })
+  }
+
+  function validateForm(): CompanyFieldErrors {
+    const errors: CompanyFieldErrors = {}
+
+    if (!form.companyName.trim()) {
+      errors.companyName = 'Company Name is required.'
+    }
+
+    if (!form.companyCode.trim()) {
+      errors.companyCode = 'Company Code is required.'
+    }
+
+    if (!form.timezone.trim()) {
+      errors.timezone = 'Timezone is required.'
+    }
+
+    if (
+      form.fiscalYearStartMonth < 1 ||
+      form.fiscalYearStartMonth > 12
+    ) {
+      errors.fiscalYearStartMonth = 'Select a valid fiscal start month.'
+    }
+
+    if (
+      form.fiscalYearStartDay < 1 ||
+      form.fiscalYearStartDay > 31
+    ) {
+      errors.fiscalYearStartDay = 'Fiscal start day must be between 1 and 31.'
+    }
+
+    return errors
+  }
+
+  function handleView(company: CompanyItem) {
+    setIsViewMode(true)
+    setEditingCompanyId(null)
+    setError('')
+    setFieldErrors({})
 
     setForm({
       companyName: company.companyName,
@@ -214,6 +331,33 @@ const [hasCompanyAccess, setHasCompanyAccess] =
       country: company.country || '',
       pincode: company.pincode || '',
       timezone: company.timezone,
+      fiscalYearStartMonth: company.fiscalYearStartMonth ?? DEFAULT_FISCAL_START_MONTH,
+      fiscalYearStartDay: company.fiscalYearStartDay ?? DEFAULT_FISCAL_START_DAY,
+      statusCode: company.statusCode,
+    })
+
+    setModalOpen(true)
+  }
+
+  function handleEdit(company: CompanyItem) {
+
+    setIsViewMode(false)
+    setEditingCompanyId(company.id)
+    setError('')
+    setFieldErrors({})
+
+    setForm({
+      companyName: company.companyName,
+      companyCode: company.companyCode,
+      companyPhone: company.companyPhone || '',
+      address: company.address || '',
+      city: company.city || '',
+      state: company.state || '',
+      country: company.country || '',
+      pincode: company.pincode || '',
+      timezone: company.timezone,
+      fiscalYearStartMonth: company.fiscalYearStartMonth ?? DEFAULT_FISCAL_START_MONTH,
+      fiscalYearStartDay: company.fiscalYearStartDay ?? DEFAULT_FISCAL_START_DAY,
       statusCode: company.statusCode,
     })
 
@@ -308,44 +452,30 @@ const [hasCompanyAccess, setHasCompanyAccess] =
 
     event.preventDefault()
 
-    if (
-      !form.companyName.trim() ||
-      !form.companyCode.trim()
-    ) {
-      setError(
-        'Company Name and Company Code are required.'
-      )
-
+    const validationErrors = validateForm()
+    if (Object.keys(validationErrors).length > 0) {
+      setFieldErrors(validationErrors)
+      setError('Please fill all required fields.')
       return
     }
 
     try {
+      setError('')
+      setFieldErrors({})
 
       const payload = {
-        id: editingCompanyId,
-        companyName: form.companyName,
-        companyCode: form.companyCode,
-        companyPhone: form.companyPhone,
-        address: form.address,
-        city: form.city,
-        state: form.state,
-        country: form.country,
-        pincode: form.pincode,
+        companyName: form.companyName.trim(),
+        companyCode: form.companyCode.trim(),
+        companyPhone: form.companyPhone.trim() || null,
+        address: form.address.trim() || null,
+        city: form.city.trim() || null,
+        state: form.state.trim() || null,
+        country: form.country.trim() || null,
+        pincode: form.pincode.trim() || null,
         timezone: form.timezone,
+        fiscalYearStartMonth: form.fiscalYearStartMonth,
+        fiscalYearStartDay: form.fiscalYearStartDay,
         statusCode: form.statusCode,
-        holidays: editingCompanyId
-          ? undefined
-          : holidays
-              .filter(
-                (holiday) =>
-                  holiday.holidayDate.trim() &&
-                  holiday.holidayName.trim()
-              )
-              .map((holiday) => ({
-                holidayDate: holiday.holidayDate,
-                holidayName: holiday.holidayName,
-                description: holiday.description || null,
-              })),
       }
 
       // EDIT
@@ -353,7 +483,10 @@ const [hasCompanyAccess, setHasCompanyAccess] =
 
         await api.put(
           '/Company',
-          payload
+          {
+            id: editingCompanyId,
+            ...payload,
+          }
         )
 
       } else {
@@ -431,9 +564,7 @@ const [hasCompanyAccess, setHasCompanyAccess] =
                 <th>Country</th>
                 <th>Timezone</th>
                 <th>Status</th>
-                {hasCompanyAccess && (
-                  <th>Edit</th>
-                )}
+                <th>Action</th>
 
 
               </tr>
@@ -517,20 +648,31 @@ const [hasCompanyAccess, setHasCompanyAccess] =
 
                     </td>
 
-                    {hasCompanyAccess && (
-                      <td>
-
+                    <td>
+                      <div className="policy-table-actions">
                         <button
+                          type="button"
                           className="edit-btn"
-                          onClick={() =>
-                            handleEdit(company)
-                          }
+                          title="View company"
+                          aria-label={`View company ${company.companyName}`}
+                          onClick={() => handleView(company)}
                         >
-                          <MdEdit />
+                          <FiEye />
                         </button>
 
-                      </td>
-                    )}
+                        {hasCompanyAccess && (
+                          <button
+                            type="button"
+                            className="edit-btn"
+                            title="Edit company"
+                            aria-label={`Edit company ${company.companyName}`}
+                            onClick={() => handleEdit(company)}
+                          >
+                            <MdEdit />
+                          </button>
+                        )}
+                      </div>
+                    </td>
 
                   </tr>
 
@@ -584,7 +726,6 @@ const [hasCompanyAccess, setHasCompanyAccess] =
 
           <div
             className="act-modal-overlay"
-            onClick={closeModal}
           >
 
             <div
@@ -597,9 +738,11 @@ const [hasCompanyAccess, setHasCompanyAccess] =
               <div className="act-modal-header">
 
                 <h2>
-                  {editingCompanyId
-                    ? 'Edit Company'
-                    : 'New Company'}
+                  {isViewMode
+                    ? 'View Company'
+                    : editingCompanyId
+                      ? 'Edit Company'
+                      : 'New Company'}
                 </h2>
 
                 <button
@@ -612,13 +755,16 @@ const [hasCompanyAccess, setHasCompanyAccess] =
               </div>
 
               <form
+                id="company-form"
                 className="act-modal-form"
                 onSubmit={handleSubmit}
               >
 
                 <div className="act-form-row">
 
-                  <label className="act-form-field">
+                  <label
+                    className={`act-form-field${fieldErrors.companyName ? ' act-form-field--invalid' : ''}`}
+                  >
 
                     <span>
                       Company Name *
@@ -627,18 +773,26 @@ const [hasCompanyAccess, setHasCompanyAccess] =
                     <input
                       type="text"
                       value={form.companyName}
-                      onChange={(e) =>
+                      readOnly={isViewMode}
+                      onChange={(e) => {
+                        clearFieldError('companyName')
                         setForm((c) => ({
                           ...c,
-                          companyName:
-                            e.target.value,
+                          companyName: e.target.value,
                         }))
-                      }
+                      }}
                     />
+                    {fieldErrors.companyName && (
+                      <span className="field-error-message">
+                        {fieldErrors.companyName}
+                      </span>
+                    )}
 
                   </label>
 
-                  <label className="act-form-field">
+                  <label
+                    className={`act-form-field${fieldErrors.companyCode ? ' act-form-field--invalid' : ''}`}
+                  >
 
                     <span>
                       Company Code *
@@ -647,14 +801,20 @@ const [hasCompanyAccess, setHasCompanyAccess] =
                     <input
                       type="text"
                       value={form.companyCode}
-                      onChange={(e) =>
+                      readOnly={isViewMode}
+                      onChange={(e) => {
+                        clearFieldError('companyCode')
                         setForm((c) => ({
                           ...c,
-                          companyCode:
-                            e.target.value,
+                          companyCode: e.target.value,
                         }))
-                      }
+                      }}
                     />
+                    {fieldErrors.companyCode && (
+                      <span className="field-error-message">
+                        {fieldErrors.companyCode}
+                      </span>
+                    )}
 
                   </label>
 
@@ -671,6 +831,7 @@ const [hasCompanyAccess, setHasCompanyAccess] =
                     <input
                       type="text"
                       value={form.companyPhone}
+                      readOnly={isViewMode}
                       onChange={(e) =>
                         setForm((c) => ({
                           ...c,
@@ -682,10 +843,12 @@ const [hasCompanyAccess, setHasCompanyAccess] =
 
                   </label>
 
-                  <label className="act-form-field">
+                  <label
+                    className={`act-form-field${fieldErrors.timezone ? ' act-form-field--invalid' : ''}`}
+                  >
 
                     <span>
-                      Timezone
+                      Timezone *
                     </span>
 
                     {/* <select
@@ -718,24 +881,102 @@ const [hasCompanyAccess, setHasCompanyAccess] =
                       menuPlacement="auto"
                       menuShouldScrollIntoView={false}
                       classNamePrefix="act-select"
-                      options={timezones.map((tz) => ({
-                        value: tz,
-                        label: tz,
-                      }))}
+                      isDisabled={isViewMode}
+                      options={buildTimezoneSelectOptions(form.timezone).map(
+                        (option) => ({
+                          value: option.value,
+                          label: option.label,
+                        })
+                      )}
                       value={{
                         value: form.timezone,
-                        label: form.timezone,
+                        label:
+                          buildTimezoneSelectOptions(form.timezone).find(
+                            (option) => option.value === form.timezone
+                          )?.label ?? form.timezone,
                       }}
-                      onChange={(selected) =>
+                      onChange={(selected) => {
+                        clearFieldError('timezone')
                         setForm((c) => ({
                           ...c,
                           timezone: selected
                             ? selected.value
-                            : '',
+                            : DEFAULT_TIMEZONE,
                         }))
-                      }
+                      }}
                     />
+                    {fieldErrors.timezone && (
+                      <span className="field-error-message">
+                        {fieldErrors.timezone}
+                      </span>
+                    )}
 
+                  </label>
+
+                </div>
+
+                <div className="act-form-row">
+
+                  <label
+                    className={`act-form-field${fieldErrors.fiscalYearStartMonth ? ' act-form-field--invalid' : ''}`}
+                  >
+                    <span>Fiscal Year Start Month *</span>
+
+                    <Select
+                      menuPortalTarget={document.body}
+                      menuPosition="fixed"
+                      menuPlacement="auto"
+                      menuShouldScrollIntoView={false}
+                      classNamePrefix="act-select"
+                      isDisabled={isViewMode}
+                      options={FISCAL_MONTH_OPTIONS}
+                      value={
+                        FISCAL_MONTH_OPTIONS.find(
+                          (option) =>
+                            option.value === form.fiscalYearStartMonth
+                        ) ?? FISCAL_MONTH_OPTIONS[3]
+                      }
+                      onChange={(selected) => {
+                        clearFieldError('fiscalYearStartMonth')
+                        setForm((current) => ({
+                          ...current,
+                          fiscalYearStartMonth: selected
+                            ? Number(selected.value)
+                            : DEFAULT_FISCAL_START_MONTH,
+                        }))
+                      }}
+                    />
+                    {fieldErrors.fiscalYearStartMonth && (
+                      <span className="field-error-message">
+                        {fieldErrors.fiscalYearStartMonth}
+                      </span>
+                    )}
+                  </label>
+
+                  <label
+                    className={`act-form-field${fieldErrors.fiscalYearStartDay ? ' act-form-field--invalid' : ''}`}
+                  >
+                    <span>Fiscal Year Start Day *</span>
+
+                    <input
+                      type="number"
+                      min={1}
+                      max={31}
+                      value={form.fiscalYearStartDay}
+                      readOnly={isViewMode}
+                      onChange={(e) => {
+                        clearFieldError('fiscalYearStartDay')
+                        setForm((current) => ({
+                          ...current,
+                          fiscalYearStartDay: Number(e.target.value),
+                        }))
+                      }}
+                    />
+                    {fieldErrors.fiscalYearStartDay && (
+                      <span className="field-error-message">
+                        {fieldErrors.fiscalYearStartDay}
+                      </span>
+                    )}
                   </label>
 
                 </div>
@@ -751,6 +992,7 @@ const [hasCompanyAccess, setHasCompanyAccess] =
                     <textarea
                       rows={3}
                       value={form.address}
+                      readOnly={isViewMode}
                       onChange={(e) =>
                         setForm((c) => ({
                           ...c,
@@ -778,6 +1020,7 @@ const [hasCompanyAccess, setHasCompanyAccess] =
                     <input
                       type="text"
                       value={form.city}
+                      readOnly={isViewMode}
                       onChange={(e) =>
                         setForm((c) => ({
                           ...c,
@@ -798,6 +1041,7 @@ const [hasCompanyAccess, setHasCompanyAccess] =
                     <input
                       type="text"
                       value={form.state}
+                      readOnly={isViewMode}
                       onChange={(e) =>
                         setForm((c) => ({
                           ...c,
@@ -824,6 +1068,7 @@ const [hasCompanyAccess, setHasCompanyAccess] =
                     <input
                       type="text"
                       value={form.country}
+                      readOnly={isViewMode}
                       onChange={(e) =>
                         setForm((c) => ({
                           ...c,
@@ -844,6 +1089,7 @@ const [hasCompanyAccess, setHasCompanyAccess] =
                     <input
                       type="text"
                       value={form.pincode}
+                      readOnly={isViewMode}
                       onChange={(e) =>
                         setForm((c) => ({
                           ...c,
@@ -857,13 +1103,6 @@ const [hasCompanyAccess, setHasCompanyAccess] =
 
 
                 </div>
-
-                {!editingCompanyId && (
-                  <HolidayInlineEditor
-                    holidays={holidays}
-                    onChange={setHolidays}
-                  />
-                )}
 
                 {error && (
 
@@ -882,17 +1121,20 @@ const [hasCompanyAccess, setHasCompanyAccess] =
                   className="act-cancel-btn"
                   onClick={closeModal}
                 >
-                  Cancel
+                  {isViewMode ? 'Close' : 'Cancel'}
                 </button>
 
+                {!isViewMode && (
                 <button
                   type="submit"
+                  form="company-form"
                   className="act-submit-btn"
                 >
                   {editingCompanyId
                     ? 'Update Company'
                     : 'Create Company'}
                 </button>
+                )}
 
               </div>
 

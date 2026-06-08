@@ -2,6 +2,8 @@ using System.Text.Json;
 using Hrms.NewApi.Dtos;
 using Hrms.NewApi.Interfaces;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 
 
@@ -20,15 +22,28 @@ public class UsersController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<IActionResult> CreateUser([FromBody] UserUpsertDto request)
+    public async Task<IActionResult> CreateUser(
+        [FromBody] UserUpsertDto request,
+        CancellationToken cancellationToken)
     {
         if (!ModelState.IsValid)
         {
             return BadRequest(ModelState);
         }
 
-        var createdUser = await _userManager.CreateUserAsync(request);
-        return CreatedAtAction(nameof(GetUserById), new { id = createdUser.Id }, createdUser);
+        try
+        {
+            var createdUser = await _userManager.CreateUserAsync(request, cancellationToken);
+            return CreatedAtAction(nameof(GetUserById), new { id = createdUser.Id }, createdUser);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException pgEx)
+        {
+            return BadRequest(new { message = GetDatabaseErrorMessage(pgEx) });
+        }
     }
 
     [HttpPut("{id:int}")]
@@ -143,5 +158,16 @@ public async Task<IActionResult> UpdateUserStatus(
     {
         var rawSession = HttpContext.Session.GetString(SessionKey);
         return rawSession is null ? null : JsonSerializer.Deserialize<SessionInfoDto>(rawSession);
+    }
+
+    private static string GetDatabaseErrorMessage(PostgresException pgEx)
+    {
+        if (pgEx.SqlState == PostgresErrorCodes.UniqueViolation
+            && pgEx.ConstraintName == "PK_userleavebalances")
+        {
+            return "Leave balances could not be initialized because the database ID sequence is out of sync. Run the latest database migrations and try again.";
+        }
+
+        return "Unable to save the user due to a database conflict. Please try again or contact support.";
     }
 }

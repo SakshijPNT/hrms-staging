@@ -2,6 +2,7 @@ using System.Text.Json;
 using Hrms.NewApi.Dtos;
 using Hrms.NewApi.Interfaces;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace Hrms.NewApi.Controllers;
 
@@ -16,6 +17,95 @@ public class PolicyController : ControllerBase
     public PolicyController(IPolicyManager policyManager)
     {
         _policyManager = policyManager;
+    }
+
+    [HttpPost("setup")]
+    public async Task<IActionResult> CreatePolicySetup(
+        [FromBody] PolicySetupCreateDto request,
+        CancellationToken cancellationToken)
+    {
+        var session = GetSessionInfo();
+
+        if (session is null)
+        {
+            return Unauthorized(new { message = "No active session." });
+        }
+
+        try
+        {
+            var result = await _policyManager.CreatePolicySetupAsync(
+                request,
+                session.UserId,
+                cancellationToken);
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = GetErrorMessage(ex) });
+        }
+    }
+
+    [HttpPut("setup")]
+    public async Task<IActionResult> UpdatePolicySetup(
+        [FromBody] PolicySetupUpdateDto request,
+        CancellationToken cancellationToken)
+    {
+        var session = GetSessionInfo();
+
+        if (session is null)
+        {
+            return Unauthorized(new { message = "No active session." });
+        }
+
+        try
+        {
+            var result = await _policyManager.UpdatePolicySetupAsync(
+                request,
+                session.UserId,
+                cancellationToken);
+
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = GetErrorMessage(ex) });
+        }
+    }
+
+    [HttpGet("company-context")]
+    public async Task<IActionResult> GetCompanyContext(
+        [FromQuery] int companyId,
+        CancellationToken cancellationToken)
+    {
+        var session = GetSessionInfo();
+
+        if (session is null)
+        {
+            return Unauthorized(new { message = "No active session." });
+        }
+
+        if (companyId <= 0)
+        {
+            return BadRequest(new { message = "A valid companyId is required." });
+        }
+
+        try
+        {
+            var context = await _policyManager.GetCompanyContextAsync(
+                companyId,
+                cancellationToken);
+
+            return Ok(context);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
     }
 
     [HttpPost("CreatePolicy")]
@@ -81,6 +171,44 @@ public class PolicyController : ControllerBase
             ? null
             : JsonSerializer.Deserialize<SessionInfoDto>(
                 rawSession);
+    }
+
+    private static string GetErrorMessage(Exception ex)
+    {
+        if (ex is DbUpdateException dbUpdateException
+            && dbUpdateException.InnerException?.Message is string innerMessage)
+        {
+            if (innerMessage.Contains("fk_cp_company", StringComparison.OrdinalIgnoreCase)
+                || (innerMessage.Contains("23503", StringComparison.OrdinalIgnoreCase)
+                    && innerMessage.Contains("companypolicies", StringComparison.OrdinalIgnoreCase)))
+            {
+                return "Company Id was not found. Create the company in Company Configuration first, or enter a valid Company Id.";
+            }
+
+            if (innerMessage.Contains("PK_leavetypemaster", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Leave type save failed due to a database id conflict. Restart the API and try again, or contact your DBA to reset the leavetypemaster id sequence.";
+            }
+
+            if (innerMessage.Contains("uq_ltm_company_name", StringComparison.OrdinalIgnoreCase))
+            {
+                return "A leave type with this name already exists for this company.";
+            }
+
+            if (innerMessage.Contains("uq_hl_company_date", StringComparison.OrdinalIgnoreCase))
+            {
+                return "A holiday already exists on this date for this company.";
+            }
+
+            if (innerMessage.Contains("chk_cp_shift", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Shift end must be later than shift start.";
+            }
+
+            return innerMessage;
+        }
+
+        return ex.Message;
     }
 
     [HttpGet]

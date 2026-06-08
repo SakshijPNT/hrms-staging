@@ -42,6 +42,10 @@ public class RolesController : ControllerBase
             return Unauthorized(new { message = "No active session." });
         }
 
+        request.CompanyId = session.CompanyId;
+        request.CreatedBy = session.UserId;
+        request.UpdatedBy = session.UserId;
+
         try
         {
             var role = await _roleManager.CreateRoleAsync(request, session.CompanyId, cancellationToken);
@@ -59,8 +63,12 @@ public class RolesController : ControllerBase
 [HttpGet("activities")]
 public async Task<IActionResult> GetActivities(CancellationToken cancellationToken)
 {
-    // Fetches real activities saved in your database master table
-    // Note: Ensure your controller constructor injects your DbContext as '_dbContext'
+    var session = GetSessionInfo();
+    if (session is null)
+    {
+        return Unauthorized(new { message = "No active session." });
+    }
+
     var activities = await _dbContext.ActivityMasters
     .Where(a => a.StatusCode == 1)
     .Select(a => new
@@ -87,6 +95,10 @@ public async Task<IActionResult> GetActivities(CancellationToken cancellationTok
         {
             return Unauthorized(new { message = "No active session." });
         }
+
+        request.CompanyId = session.CompanyId;
+        request.CreatedBy = session.UserId;
+        request.UpdatedBy = session.UserId;
 
         try
         {

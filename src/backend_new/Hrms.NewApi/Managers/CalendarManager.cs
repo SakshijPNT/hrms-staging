@@ -54,6 +54,12 @@ public class CalendarManager : ICalendarManager
             endDate,
             cancellationToken);
 
+        var regularizations = await LoadRegularizationsAsync(
+            userId,
+            startDate,
+            endDate,
+            cancellationToken);
+
         var days = new List<CalendarDayDto>();
         for (var date = startDate; date <= endDate; date = date.AddDays(1))
         {
@@ -62,7 +68,8 @@ public class CalendarManager : ICalendarManager
                 context,
                 attendanceByDate,
                 holidays,
-                leaveApplications));
+                leaveApplications,
+                regularizations));
         }
 
         return new MonthlyCalendarResponseDto
@@ -70,6 +77,66 @@ public class CalendarManager : ICalendarManager
             Year = year,
             Month = month,
             Timezone = context.Timezone,
+            Days = days,
+        };
+    }
+
+    public async Task<MonthlyAttendanceLogResponseDto> GetMonthlyAttendanceLogAsync(
+        int userId,
+        int year,
+        int month,
+        CancellationToken cancellationToken = default)
+    {
+        if (month is < 1 or > 12)
+        {
+            throw new InvalidOperationException("Month must be between 1 and 12.");
+        }
+
+        var context = await LoadUserContextAsync(userId, cancellationToken);
+        var startDate = new DateOnly(year, month, 1);
+        var endDate = startDate.AddMonths(1).AddDays(-1);
+
+        var attendanceLogs = await _dbContext.UserAttendanceLogs
+            .AsNoTracking()
+            .Where(x => x.UserId == userId
+                && x.LogDate >= startDate
+                && x.LogDate <= endDate
+                && x.StatusCode == 1)
+            .ToListAsync(cancellationToken);
+
+        var attendanceByDate = attendanceLogs.ToDictionary(x => x.LogDate);
+
+        var holidays = await _dbContext.HolidayLists
+            .AsNoTracking()
+            .Where(x => x.CompanyId == context.CompanyId
+                && x.StatusCode == 1
+                && x.HolidayDate >= startDate
+                && x.HolidayDate <= endDate)
+            .ToDictionaryAsync(x => x.HolidayDate, cancellationToken);
+
+        var leaveApplications = await LoadLeaveApplicationsAsync(
+            userId,
+            startDate,
+            endDate,
+            cancellationToken);
+
+        var days = new List<AttendanceLogDayDto>();
+        for (var date = startDate; date <= endDate; date = date.AddDays(1))
+        {
+            days.Add(BuildAttendanceLogDay(
+                date,
+                context,
+                attendanceByDate,
+                holidays,
+                leaveApplications));
+        }
+
+        return new MonthlyAttendanceLogResponseDto
+        {
+            Year = year,
+            Month = month,
+            Timezone = context.Timezone,
+            Today = context.Today,
             Days = days,
         };
     }
@@ -207,12 +274,99 @@ public class CalendarManager : ICalendarManager
         };
     }
 
-    private static CalendarDayDto BuildCalendarDay(
+    private static AttendanceLogDayDto BuildAttendanceLogDay(
         DateOnly date,
         UserCalendarContext context,
         IReadOnlyDictionary<DateOnly, UserAttendanceLog> attendanceByDate,
         IReadOnlyDictionary<DateOnly, HolidayList> holidays,
         IReadOnlyList<LeaveApplicationRow> leaveApplications)
+    {
+        var isFuture = date > context.Today;
+        var isToday = date == context.Today;
+        holidays.TryGetValue(date, out var holiday);
+        var dayType = ResolveDayType(date, context.WorkDays, holiday != null);
+        attendanceByDate.TryGetValue(date, out var attendance);
+        var leaveBadges = GetLeaveBadgesForDate(date, leaveApplications);
+        var displayStatus = ResolveTableDisplayStatus(
+            date,
+            dayType,
+            attendance,
+            leaveBadges,
+            context.Today);
+
+        return new AttendanceLogDayDto
+        {
+            Date = date,
+            DayType = dayType,
+            DisplayStatus = displayStatus,
+            HolidayName = holiday?.HolidayName,
+            CheckInTime = attendance?.CheckInTime,
+            CheckOutTime = attendance?.CheckOutTime,
+            WorkedMinutes = attendance?.WorkedMinutes ?? 0,
+            IsFuture = isFuture,
+            IsToday = isToday,
+            LeaveBadges = leaveBadges,
+        };
+    }
+
+    private static string? ResolveTableDisplayStatus(
+        DateOnly date,
+        string dayType,
+        UserAttendanceLog? attendance,
+        IReadOnlyList<LeaveBadgeDto> leaveBadges,
+        DateOnly today)
+    {
+        if (attendance != null)
+        {
+            if (!string.IsNullOrWhiteSpace(attendance.AttendanceStatus)
+                && attendance.AttendanceStatus != "CHECKED_IN")
+            {
+                return attendance.AttendanceStatus;
+            }
+
+            if (attendance.CheckInTime.HasValue)
+            {
+                return string.IsNullOrWhiteSpace(attendance.AttendanceStatus)
+                    ? "CHECKED_IN"
+                    : attendance.AttendanceStatus;
+            }
+        }
+
+        if (leaveBadges.Any(x => !x.IsPending))
+        {
+            return "LEAVE";
+        }
+
+        if (dayType == "HOLIDAY")
+        {
+            return "HOLIDAY";
+        }
+
+        if (dayType == "WEEK_OFF")
+        {
+            return "WEEK_OFF";
+        }
+
+        if (date > today)
+        {
+            return null;
+        }
+
+        if (leaveBadges.Any(x => x.IsPending))
+        {
+            return "LEAVE_PENDING";
+        }
+
+        return date < today ? "ABSENT" : null;
+    }
+
+    private static CalendarDayDto BuildCalendarDay(
+        DateOnly date,
+        UserCalendarContext context,
+        IReadOnlyDictionary<DateOnly, UserAttendanceLog> attendanceByDate,
+        IReadOnlyDictionary<DateOnly, HolidayList> holidays,
+        IReadOnlyList<LeaveApplicationRow> leaveApplications,
+        IReadOnlyDictionary<DateOnly, RegularizationRow> regularizationsByDate)
     {
         var isFuture = date > context.Today;
         holidays.TryGetValue(date, out var holiday);
@@ -226,6 +380,8 @@ public class CalendarManager : ICalendarManager
             attendance,
             context.Today);
 
+        regularizationsByDate.TryGetValue(date, out var regularization);
+
         return new CalendarDayDto
         {
             Date = date,
@@ -234,6 +390,8 @@ public class CalendarManager : ICalendarManager
             HolidayName = holiday?.HolidayName,
             LeaveBadges = leaveBadges,
             IsFuture = isFuture,
+            IsRegularized = attendance?.IsRegularized ?? false,
+            HasRegularizationPending = regularization?.ApprovalStatus == "PENDING",
         };
     }
 
@@ -311,6 +469,7 @@ public class CalendarManager : ICalendarManager
             "WEEK_OFF" => "week_off",
             "PRESENT" => "present",
             "HALF_DAY" => "half_day",
+            "SHORT_DAY" => "short_day",
             "CHECKED_IN" => "present",
             "ABSENT" => "absent",
             _ => dayType switch
@@ -320,6 +479,35 @@ public class CalendarManager : ICalendarManager
                 _ => "none",
             },
         };
+    }
+
+    private async Task<IReadOnlyDictionary<DateOnly, RegularizationRow>> LoadRegularizationsAsync(
+        int userId,
+        DateOnly fromDate,
+        DateOnly toDate,
+        CancellationToken cancellationToken)
+    {
+        var rows = await _dbContext.AttendanceRegularizations
+            .AsNoTracking()
+            .Where(x => x.UserId == userId
+                && x.LogDate >= fromDate
+                && x.LogDate <= toDate
+                && x.StatusCode == 1
+                && (x.ApprovalStatus == "PENDING" || x.ApprovalStatus == "APPROVED"))
+            .Select(x => new RegularizationRow
+            {
+                LogDate = x.LogDate,
+                ApprovalStatus = x.ApprovalStatus,
+            })
+            .ToListAsync(cancellationToken);
+
+        return rows
+            .GroupBy(x => x.LogDate)
+            .ToDictionary(
+                group => group.Key,
+                group =>
+                    group.FirstOrDefault(x => x.ApprovalStatus == "PENDING")
+                    ?? group.First());
     }
 
     private async Task<IReadOnlyList<LeaveApplicationRow>> LoadLeaveApplicationsAsync(
@@ -417,6 +605,12 @@ public class CalendarManager : ICalendarManager
         public string Timezone { get; init; } = "Asia/Kolkata";
         public string WorkDays { get; init; } = "MON,TUE,WED,THU,FRI";
         public DateOnly Today { get; init; }
+    }
+
+    private sealed class RegularizationRow
+    {
+        public DateOnly LogDate { get; init; }
+        public string ApprovalStatus { get; init; } = null!;
     }
 
     private sealed class LeaveApplicationRow

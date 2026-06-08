@@ -13,31 +13,6 @@ export function normalizeDate(value: unknown): string {
   return ''
 }
 
-export function extractDateTime(value: unknown): string | null {
-  if (value == null || value === '') {
-    return null
-  }
-
-  if (typeof value === 'string') {
-    return value
-  }
-
-  if (typeof value === 'object') {
-    const obj = value as Record<string, unknown>
-    const nested =
-      obj.dateTime ??
-      obj.DateTime ??
-      obj.value ??
-      obj.Value
-
-    if (typeof nested === 'string') {
-      return nested
-    }
-  }
-
-  return null
-}
-
 export function formatAttendanceTime(
   value: unknown,
   timezone: string
@@ -96,4 +71,59 @@ export function pickField(
   }
 
   return undefined
+}
+
+export function extractDateTime(value: unknown): string | null {
+  if (value == null || value === '') {
+    return null
+  }
+
+  if (typeof value === 'string') {
+    return value
+  }
+
+  if (typeof value === 'object') {
+    const obj = value as Record<string, unknown>
+    const nested =
+      obj.dateTime ??
+      obj.DateTime ??
+      obj.value ??
+      obj.Value
+
+    if (typeof nested === 'string') {
+      return nested
+    }
+  }
+
+  return null
+}
+
+export function toTimeInputValue(
+  value: unknown,
+  timezone: string
+): string {
+  const raw = extractDateTime(value)
+  if (!raw) {
+    return ''
+  }
+
+  const parsed = new Date(raw)
+  if (Number.isNaN(parsed.getTime())) {
+    return ''
+  }
+
+  try {
+    return parsed.toLocaleTimeString('en-GB', {
+      timeZone: timezone || 'Asia/Kolkata',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    })
+  } catch {
+    return parsed.toLocaleTimeString('en-GB', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    })
+  }
 }

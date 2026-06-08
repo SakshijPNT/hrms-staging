@@ -133,7 +133,7 @@ public async Task<RoleResponseDto> UpdateRoleAsync(int id,RoleUpsertDto request,
         return await _dbContext.RoleMasters
             .AsNoTracking()
             .Where(x => x.CompanyId == companyId )
-            .OrderBy(x => x.RoleName)
+            .OrderBy(x => x.Id)
             .Select(x => new RoleResponseDto
             {
                 Id = x.Id,

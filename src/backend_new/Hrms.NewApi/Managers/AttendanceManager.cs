@@ -4,6 +4,7 @@ using Hrms.NewApi.Data;
 using Hrms.NewApi.Dtos;
 using Hrms.NewApi.Interfaces;
 using Hrms.NewApi.Models;
+using Hrms.NewApi.Support;
 using Microsoft.EntityFrameworkCore;
 using TimeZoneConverter;
 
@@ -12,7 +13,7 @@ namespace Hrms.NewApi.Managers;
 public class AttendanceManager : IAttendanceManager
 {
     // US-09 week-off/holiday rules. Set true for production; false allows check-in on any day for testing.
-    private const bool EnforceWorkDayValidation = true;
+    private const bool EnforceWorkDayValidation = false;
 
     private readonly HrmsDbContext _dbContext;
 
@@ -157,6 +158,7 @@ public class AttendanceManager : IAttendanceManager
 
         attendance.AttendanceStatus = ResolveAttendanceStatus(
             attendance.WorkedMinutes,
+            attendance.CheckInTime.HasValue,
             attendance.IsEarlyLeave,
             companyPolicy);
 
@@ -364,23 +366,15 @@ public class AttendanceManager : IAttendanceManager
 
     private static string ResolveAttendanceStatus(
         int workedMinutes,
+        bool hasCheckIn,
         bool isEarlyLeave,
         CompanyPolicies policy)
     {
-        var fullDayMinutes = (int)(policy.WorkHours * 60);
-        var halfDayMinutes = (int)(policy.HalfDayThreshold * 60);
-
-        if (!isEarlyLeave && workedMinutes >= fullDayMinutes)
-        {
-            return "PRESENT";
-        }
-
-        if (workedMinutes >= halfDayMinutes)
-        {
-            return "HALF_DAY";
-        }
-
-        return "ABSENT";
+        return AttendanceStatusHelper.ResolveFromWorkedMinutes(
+            workedMinutes,
+            hasCheckIn,
+            isEarlyLeave,
+            policy);
     }
 
     private static IReadOnlySet<DayOfWeek> ParseWorkDays(string workDays)

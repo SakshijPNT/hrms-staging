@@ -9,7 +9,7 @@ import Login from './pages/login'
 import Dashboard from './pages/Dashboard'
 import { RolesPage } from './pages/Roles'
 import { UsersPage } from './pages/Users'
-import { MyApplicationsPage } from './pages/MyApplications'
+//import { MyApplicationsPage } from './pages/MyApplications'
 import { RegularizationApprovalsPage } from './pages/RegularizationApprovals'
 import { MyLeavesPage } from './pages/MyLeaves'
 import { MyApprovalPage } from './pages/MyApproval'
@@ -64,14 +64,14 @@ function App() {
           }
         />
 
-        <Route
+        {/*<Route
           path="/my-applications"
           element={
             <ProtectedRoute>
               <MyApplicationsPage />
             </ProtectedRoute>
           }
-        />
+        />*/}
 
         <Route
           path="/regularization-approvals"
@@ -89,7 +89,11 @@ function App() {
 
         <Route
           path="/my-approval"
-          element={<MyApprovalPage />}
+          element={
+            <ProtectedRoute>
+              <MyApprovalPage />
+            </ProtectedRoute>
+          }
         />
 
         {/* Company */}

@@ -12,6 +12,8 @@ public class CompanyResponseDto
     public string? Country { get; set; }
     public string? Pincode { get; set; }
     public string Timezone { get; set; } = null!;
+    public short FiscalYearStartMonth { get; set; }
+    public short FiscalYearStartDay { get; set; }
     public short StatusCode { get; set; }
     public DateTimeOffset CreatedOn { get; set; }
     public DateTimeOffset UpdatedOn { get; set; }

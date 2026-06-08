@@ -32,6 +32,12 @@ public class CompanyCreateDto
     [MaxLength(60)]
     public string Timezone { get; set; } = "Asia/Kolkata";
 
+    [Range(1, 12)]
+    public short FiscalYearStartMonth { get; set; } = 4;
+
+    [Range(1, 31)]
+    public short FiscalYearStartDay { get; set; } = 1;
+
     public short StatusCode { get; set; } = 1;
 
     public IReadOnlyList<HolidayBulkItemDto> Holidays { get; set; } = Array.Empty<HolidayBulkItemDto>();

@@ -1,27 +1,20 @@
 import Layout from './Layout'
 import '../styles/Style.css'
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import api from '../services/api'
+import { useEffect, useMemo, useState } from 'react'
 import type { AxiosError } from 'axios'
+import api from '../services/api'
 import type { SessionInfo } from '../../types/auth'
 import type { RegularizationApplication } from '../../types/regularization'
+import { formatCorrectionTypeLabel } from '../../types/regularization'
 import RegularizationModal from '../components/RegularizationModal'
+import { ApplyLeaveModal } from '../components/ApplyLeaveModal'
 import { formatAttendanceTime, normalizeDate } from '../utils/attendanceFormat'
 import { FiSearch, FiPlus } from 'react-icons/fi'
-import Select from 'react-select'
-import DatePicker from 'react-datepicker'
-import 'react-datepicker/dist/react-datepicker.css'
-import { FiCalendar } from 'react-icons/fi'
 
 interface LeaveBalance {
   leaveTypeId: number
   leaveTypeName: string
   availableBalance: number
-}
-
-interface LeaveType {
-  id: number
-  leaveTypeName: string
 }
 
 interface Application {
@@ -45,35 +38,20 @@ export function MyApplicationsPage() {
   const [regularizations, setRegularizations] = useState<
     RegularizationApplication[]
   >([])
-  const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([])
   const [search, setSearch] = useState('')
   const [leaveModalOpen, setLeaveModalOpen] = useState(false)
   const [regularizationModalOpen, setRegularizationModalOpen] =
     useState(false)
-    const [currentPage, setCurrentPage] = useState(1)
-  const [loading, setLoading] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
   const [cancellingId, setCancellingId] = useState<number | null>(null)
-  const [error, setError] = useState('')
   const [session, setSession] = useState<SessionInfo | null>(null)
 
-const timezone = session?.timezone ?? 'Asia/Kolkata'
-const [isFromDateOpen, setIsFromDateOpen] = useState(false)
-const [isToDateOpen, setIsToDateOpen] = useState(false)
-  const [form, setForm] = useState({
-    leaveTypeId: '',
-    fromDate: '',
-    toDate: '',
-    isHalfDay: false,
-    session: '',
-    workHours: '',
-    reason: '',
-  })
+  const timezone = session?.timezone ?? 'Asia/Kolkata'
 
   useEffect(() => {
     void loadSession()
     void fetchLeaveBalances()
     void fetchApplications()
-    void fetchLeaveTypes()
     void fetchRegularizations()
   }, [])
 
@@ -115,33 +93,6 @@ const [isToDateOpen, setIsToDateOpen] = useState(false)
     }
   }
 
-  async function fetchLeaveTypes() {
-    try {
-      const response = await api.get('/user-leaves/leave-types')
-      setLeaveTypes(response.data)
-    } catch (fetchError) {
-      console.error('Error fetching leave types', fetchError)
-    }
-  }
-
-  function openLeaveModal() {
-    setForm({
-      leaveTypeId: '',
-      fromDate: '',
-      toDate: '',
-      isHalfDay: false,
-      session: '',
-      workHours: '',
-      reason: '',
-    })
-    setError('')
-    setLeaveModalOpen(true)
-  }
-
-  function closeLeaveModal() {
-    setLeaveModalOpen(false)
-  }
-
   const filteredApplications = useMemo(() => {
     const q = search.toLowerCase()
     return applications.filter(
@@ -150,11 +101,6 @@ const [isToDateOpen, setIsToDateOpen] = useState(false)
         app.approvalStatus.toLowerCase().includes(q),
     )
   }, [applications, search])
-
-
-  
-
-
 
   const applicationsPerPage = 5
 
@@ -174,11 +120,6 @@ const [isToDateOpen, setIsToDateOpen] = useState(false)
     filteredApplications.length / applicationsPerPage
   )
 
-  const leaveTypeOptions = leaveTypes.map((leave) => ({
-    value: leave.id,
-    label: leave.leaveTypeName,
-  }))
-
   const filteredRegularizations = useMemo(() => {
     const q = search.toLowerCase()
     return regularizations.filter(
@@ -188,46 +129,6 @@ const [isToDateOpen, setIsToDateOpen] = useState(false)
         normalizeDate(item.logDate).includes(q),
     )
   }, [regularizations, search])
-
-  async function handleLeaveSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-
-    if (!form.leaveTypeId || !form.fromDate || !form.reason.trim()) {
-      setError('All required fields must be filled.')
-      return
-    }
-
-    if (form.isHalfDay && !form.session) {
-      setError('Please select session for half day leave.')
-      return
-    }
-
-    try {
-      setLoading(true)
-
-      const payload = {
-        leaveTypeId: Number(form.leaveTypeId),
-        fromDate: form.fromDate,
-        toDate: form.isHalfDay ? form.fromDate : form.toDate,
-        isHalfDay: form.isHalfDay,
-        session: form.isHalfDay ? form.session : null,
-        workHours: form.workHours,
-        reason: form.reason,
-      }
-
-      await api.post('/user-leaves/applications', payload)
-      await fetchApplications()
-      await fetchLeaveBalances()
-      closeLeaveModal()
-    } catch (submitError: unknown) {
-      const axiosError = submitError as AxiosError<{ message?: string }>
-      setError(
-        axiosError.response?.data?.message ?? 'Failed to apply leave',
-      )
-    } finally {
-      setLoading(false)
-    }
-  }
 
   async function handleCancelRegularization(id: number) {
     if (!window.confirm('Cancel this regularization request?')) {
@@ -277,12 +178,21 @@ const [isToDateOpen, setIsToDateOpen] = useState(false)
 
           </div>
 
-          <button
-            className="act-new-btn"
-            onClick={openLeaveModal}
-          >
-            + New Application
-          </button>
+          <div className="act-header-actions">
+            <button
+              className="act-new-btn act-new-btn-secondary"
+              onClick={() => setRegularizationModalOpen(true)}
+            >
+              <FiPlus /> Regularization
+            </button>
+
+            <button
+              className="act-new-btn"
+              onClick={() => setLeaveModalOpen(true)}
+            >
+              + New Application
+            </button>
+          </div>
 
         </div>
 
@@ -346,7 +256,7 @@ const [isToDateOpen, setIsToDateOpen] = useState(false)
 
           <button
             className="act-new-btn"
-            onClick={openLeaveModal}
+            onClick={() => setLeaveModalOpen(true)}
           >
             <FiPlus />
             New Application
@@ -440,32 +350,35 @@ const [isToDateOpen, setIsToDateOpen] = useState(false)
 
         </div>
 
-        {regularizations.length > 0 && (
-          <div className="act-section">
-            <div className="act-table-wrapper">
-              <table className="act-table">
-                <thead>
+        <div className="act-section">
+          <div className="act-section-header">
+            <h2 className="act-section-title">Regularization Requests</h2>
+          </div>
+
+          <div className="act-table-wrapper">
+            <table className="act-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Date</th>
+                  <th>Actual IN</th>
+                  <th>Actual OUT</th>
+                  <th>Original Status</th>
+                  <th>Requested Correction</th>
+                  <th>Reason</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredRegularizations.length === 0 ? (
                   <tr>
-                    <th>ID</th>
-                    <th>Date</th>
-                    <th>Actual IN</th>
-                    <th>Actual OUT</th>
-                    <th>Requested IN</th>
-                    <th>Requested OUT</th>
-                    <th>Reason</th>
-                    <th>Status</th>
-                    <th>Actions</th>
+                    <td colSpan={9} className="act-empty">
+                      No regularization requests yet.
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {filteredRegularizations.length === 0 ? (
-                    <tr>
-                      <td colSpan={9} className="act-empty">
-                        No matching regularization requests.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredRegularizations.map((item) => (
+                ) : (
+                  filteredRegularizations.map((item) => (
                       <tr key={item.id}>
                         <td>{item.id}</td>
                         <td>{normalizeDate(item.logDate)}</td>
@@ -481,18 +394,8 @@ const [isToDateOpen, setIsToDateOpen] = useState(false)
                             timezone,
                           )}
                         </td>
-                        <td>
-                          {formatAttendanceTime(
-                            item.requestedCheckInTime,
-                            timezone,
-                          )}
-                        </td>
-                        <td>
-                          {formatAttendanceTime(
-                            item.requestedCheckOutTime,
-                            timezone,
-                          )}
-                        </td>
+                        <td>{item.originalAttendanceStatus.replace('_', ' ')}</td>
+                        <td>{formatCorrectionTypeLabel(item.requestedCorrectionType)}</td>
                         <td>{item.reason}</td>
                         <td>
                           <span className={statusClass(item.approvalStatus)}>
@@ -524,7 +427,6 @@ const [isToDateOpen, setIsToDateOpen] = useState(false)
               </table>
             </div>
           </div>
-        )}
 
         <RegularizationModal
           open={regularizationModalOpen}
@@ -535,394 +437,14 @@ const [isToDateOpen, setIsToDateOpen] = useState(false)
           }}
         />
 
-        {leaveModalOpen && (
-          <div className="act-modal-overlay" onClick={closeLeaveModal}>
-            <div
-              className="act-modal"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <div className="act-modal-header">
-                <h2>Apply Leave</h2>
-                <button
-                  type="button"
-                  className="act-modal-close"
-                  onClick={closeLeaveModal}
-                >
-                  &times;
-                </button>
-              </div>
-
-              <form className="act-modal-form" onSubmit={handleLeaveSubmit}>
-                <div className="act-form-row">
-                  <label className="act-form-field">
-
-                    <span>
-                      Leave Type *
-                    </span>
-
-         
-
-                  
-
-                    <Select
-                      menuPortalTarget={document.body}
-                      menuPosition="fixed"
-                      menuPlacement="auto"
-                      menuShouldScrollIntoView={false}
-                      classNamePrefix="act-select"
-                      options={leaveTypeOptions}
-                      placeholder="Select Leave Type"
-                      value={
-                        leaveTypeOptions.find(
-                          (option) =>
-                            String(option.value) === form.leaveTypeId
-                        ) || null
-                      }
-                      onChange={(selected) =>
-                        setForm((c) => ({
-                          ...c,
-                          leaveTypeId: selected
-                            ? String(selected.value)
-                            : '',
-                        }))
-                      }
-                    />
-
-                  </label>
-
-                  <label className="act-form-field">
-                    <span>Half Day *</span>
-                    <div className="halfday-radio-group">
-                      <label className="halfday-radio">
-                        <input
-                          type="radio"
-                          name="halfDay"
-                          checked={form.isHalfDay === true}
-                          onChange={() =>
-                            setForm((current) => ({
-                              ...current,
-                              isHalfDay: true,
-                              toDate: current.fromDate,
-                            }))
-                          }
-                        />
-                        <span>True</span>
-                      </label>
-                      <label className="halfday-radio">
-                        <input
-                          type="radio"
-                          name="halfDay"
-                          checked={form.isHalfDay === false}
-                          onChange={() =>
-                            setForm((current) => ({
-                              ...current,
-                              isHalfDay: false,
-                              session: '',
-                            }))
-                          }
-                        />
-                        <span>False</span>
-                      </label>
-                    </div>
-                  </label>
-                </div>
-
-                <div className="act-form-row">
-
-                  {/* FROM DATE */}
-                  <label className="act-form-field">
-
-                    <span>
-                      From Date *
-                    </span>
-
-                    <input
-                      type="date"
-                      value={form.fromDate}
-                      onChange={(event) =>
-                        setForm((current) => ({
-                          ...current,
-                          fromDate: event.target.value,
-                          toDate: current.isHalfDay
-                            ? event.target.value
-                            : current.toDate,
-                        }))
-                      }
-                    />
-
-                  </label> 
-        
-                  <label className="act-form-field">
-                    <span>
-                      From Date *
-                    </span>
-
-                    <div className="act-date-picker-wrapper">
-
-
-                      <DatePicker
-                        selected={
-                          form.fromDate
-                            ? new Date(form.fromDate)
-                            : null
-                        }
-                        onChange={(date: Date | null) => {
-
-                          const formattedDate =
-                            date
-                              ? date.toISOString().split('T')[0]
-                              : ''
-
-                          setForm((c) => ({
-                            ...c,
-                            fromDate: formattedDate,
-                            toDate: c.isHalfDay
-                              ? formattedDate
-                              : c.toDate,
-                          }))
-
-                          setIsFromDateOpen(false)
-                        }}
-                        onInputClick={() =>
-                          setIsFromDateOpen(true)
-                        }
-                        open={isFromDateOpen}
-                        onClickOutside={() =>
-                          setIsFromDateOpen(false)
-                        }
-                        placeholderText="Select from date"
-                        dateFormat="dd MMM yyyy"
-                        className="act-date-picker"
-                        popperClassName="act-datepicker-popper"
-                        portalId="root"
-                        popperPlacement="bottom-start"
-                      />
-
-                      <FiCalendar
-                        className="act-date-icon"
-                        onClick={() =>
-                          setIsFromDateOpen((prev) => !prev)
-                        }
-                      />
-
-                    </div>
-                  </label>
-
-                  {/* TO DATE */}
-                  <label className="act-form-field">
-
-                    <span>
-                      To Date *
-                    </span>
-
-                    <input
-                      type="date"
-                      value={form.isHalfDay ? form.fromDate : form.toDate}
-                      disabled={form.isHalfDay}
-                      onChange={(event) =>
-                        setForm((current) => ({
-                          ...current,
-                          toDate: event.target.value,
-                        }))
-                      }
-                    />
-
-                  </label> 
-                  <label className="act-form-field">
-
-                    <span>
-                      To Date *
-                    </span>
-
-                    <div className="act-date-picker-wrapper">
-                      <DatePicker
-                        selected={
-                          form.toDate
-                            ? new Date(form.toDate)
-                            : null
-                        }
-                        onChange={(date: Date | null) => {
-
-                          setForm((c) => ({
-                            ...c,
-                            toDate: date
-                              ? date.toISOString().split('T')[0]
-                              : '',
-                          }))
-
-                          setIsToDateOpen(false)
-                        }}
-                        onInputClick={() =>
-                          setIsToDateOpen(true)
-                        }
-                        open={isToDateOpen}
-                        onClickOutside={() =>
-                          setIsToDateOpen(false)
-                        }
-                        placeholderText="Select to date"
-                        dateFormat="dd MMM yyyy"
-                        className="act-date-picker"
-                        popperClassName="act-datepicker-popper"
-                        portalId="root"
-                        popperPlacement="bottom-start"
-                        disabled={form.isHalfDay}
-                      />
-
-                      <FiCalendar
-                        className={`act-date-icon ${form.isHalfDay ? 'disabled-date-icon' : ''
-                          }`}
-                        onClick={() => {
-                          if (!form.isHalfDay) {
-                            setIsToDateOpen((prev) => !prev)
-                          }
-                        }}
-                      />
-
-                    </div>
-                  </label>
-                </div>
-
-                {form.isHalfDay && (
-                  <div className="act-form-row">
-                    <label className="act-form-field">
-
-                      <span>
-                        Session *
-                      </span>
-
-                      {/* <select
-                        value={form.session}
-                        onChange={(event) =>
-                          setForm((current) => ({
-                            ...current,
-                            session: event.target.value,
-                          }))
-                        }
-                      >
-
-                        <option value="">
-                          Select Session
-                        </option>
-
-                        <option value="FIRST_HALF">
-                          First Half
-                        </option>
-
-                        <option value="SECOND_HALF">
-                          Second Half
-                        </option>
-
-                      </select> */}
-
-                      <Select
-                        menuPortalTarget={document.body}
-                        menuPosition="fixed"
-                        menuPlacement="auto"
-                        menuShouldScrollIntoView={false}
-                        classNamePrefix="act-select"
-                        placeholder="Select Session"
-                        options={[
-                          {
-                            value: 'FIRST_HALF',
-                            label: 'First Half',
-                          },
-                          {
-                            value: 'SECOND_HALF',
-                            label: 'Second Half',
-                          },
-                        ]}
-                        value={
-                          form.session
-                            ? {
-                              value: form.session,
-                              label:
-                                form.session === 'FIRST_HALF'
-                                  ? 'First Half'
-                                  : 'Second Half',
-                            }
-                            : null
-                        }
-                        onChange={(selected) =>
-                          setForm((c) => ({
-                            ...c,
-                            session: selected
-                              ? selected.value
-                              : '',
-                          }))
-                        }
-                      />
-
-                    </label>
-                  </div>
-                )}
-
-                <div className="act-form-row">
-                  <label className="act-form-field">
-                    <span>Work Hours</span>
-                    <input
-                      type="number"
-                      min="0"
-                      max="24"
-                      value={form.workHours}
-                      placeholder="Enter work hours"
-                      onChange={(event) =>
-                        setForm((current) => ({
-                          ...current,
-                          workHours: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="act-form-field">
-                    <span>Reason *</span>
-                    <textarea
-                      rows={3}
-                      value={form.reason}
-                      placeholder="Enter leave reason"
-                      onChange={(event) =>
-                        setForm((current) => ({
-                          ...current,
-                          reason: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-                </div>
-
-                {error && <div className="form-error">{error}</div>}
-
-
-              </form>
-
-              {/* ACTIONS */}
-              <div className="act-modal-actions">
-
-                <button
-                  type="button"
-                  className="act-cancel-btn"
-                  onClick={closeLeaveModal}
-                >
-                  Cancel
-                </button>
-
-                <button
-                  type="submit"
-                  className="act-submit-btn"
-                  disabled={loading}
-                >
-
-                  {loading
-                    ? 'Applying...'
-                    : 'Apply Leave'}
-
-                </button>
-
-              </div>
-
-            </div>
-          </div>
-        )}
+        <ApplyLeaveModal
+          open={leaveModalOpen}
+          onClose={() => setLeaveModalOpen(false)}
+          onSuccess={() => {
+            void fetchApplications()
+            void fetchLeaveBalances()
+          }}
+        />
       </div>
     </Layout>
   )

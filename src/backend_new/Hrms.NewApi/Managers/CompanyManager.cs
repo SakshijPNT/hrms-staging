@@ -2,6 +2,7 @@ using Hrms.NewApi.Data;
 using Hrms.NewApi.Dtos;
 using Hrms.NewApi.Interfaces;
 using Hrms.NewApi.Models;
+using Hrms.NewApi.Support;
 using Microsoft.EntityFrameworkCore;
 
 namespace Hrms.NewApi.Managers;
@@ -55,6 +56,16 @@ public class CompanyManager : ICompanyManager
                 $"Company with code {request.CompanyCode} already exists.");
         }
 
+        if (!CuratedTimezones.IsAllowed(request.Timezone))
+        {
+            throw new InvalidOperationException(
+                "Timezone must be one of the supported values.");
+        }
+
+        var (fiscalStartMonth, fiscalStartDay) = FiscalYearHelper.NormalizeFiscalStart(
+            request.FiscalYearStartMonth,
+            request.FiscalYearStartDay);
+
         var now = DateTimeOffset.UtcNow;
 
         var company = new CompanyMaster
@@ -68,6 +79,8 @@ public class CompanyManager : ICompanyManager
             Country = request.Country,
             Pincode = request.Pincode,
             Timezone = request.Timezone,
+            FiscalYearStartMonth = fiscalStartMonth,
+            FiscalYearStartDay = fiscalStartDay,
             StatusCode = request.StatusCode,
             CreatedBy = createdBy,
             CreatedOn = now,
@@ -106,7 +119,7 @@ public class CompanyManager : ICompanyManager
         }
 
         return await query
-            .OrderBy(x => x.CompanyName)
+            .OrderBy(x => x.Id)
             .Select(x => new CompanyListItemDto
             {
                 Id = x.Id,
@@ -119,6 +132,8 @@ public class CompanyManager : ICompanyManager
                 Country = x.Country,
                 Pincode = x.Pincode,
                 Timezone = x.Timezone,
+                FiscalYearStartMonth = x.FiscalYearStartMonth,
+                FiscalYearStartDay = x.FiscalYearStartDay,
                 StatusCode = x.StatusCode,
             })
             .ToListAsync(cancellationToken);
@@ -138,6 +153,8 @@ public class CompanyManager : ICompanyManager
             Country = company.Country,
             Pincode = company.Pincode,
             Timezone = company.Timezone,
+            FiscalYearStartMonth = company.FiscalYearStartMonth,
+            FiscalYearStartDay = company.FiscalYearStartDay,
             StatusCode = company.StatusCode,
             CreatedOn = company.CreatedOn,
             UpdatedOn = company.UpdatedOn,
@@ -201,6 +218,13 @@ public class CompanyManager : ICompanyManager
             $"Company code {request.CompanyCode} already exists.");
     }
 
+    if (!string.IsNullOrWhiteSpace(request.Timezone)
+        && !CuratedTimezones.IsAllowed(request.Timezone))
+    {
+        throw new InvalidOperationException(
+            "Timezone must be one of the supported values.");
+    }
+
     company.CompanyName = request.CompanyName;
     company.CompanyCode = request.CompanyCode;
     company.CompanyPhone = request.CompanyPhone;
@@ -209,7 +233,20 @@ public class CompanyManager : ICompanyManager
     company.State = request.State;
     company.Country = request.Country;
     company.Pincode = request.Pincode;
-    company.Timezone = request.Timezone;
+    if (!string.IsNullOrWhiteSpace(request.Timezone))
+    {
+        company.Timezone = request.Timezone.Trim();
+    }
+
+    if (request.FiscalYearStartMonth.HasValue || request.FiscalYearStartDay.HasValue)
+    {
+        var (fiscalStartMonth, fiscalStartDay) = FiscalYearHelper.NormalizeFiscalStart(
+            request.FiscalYearStartMonth ?? company.FiscalYearStartMonth,
+            request.FiscalYearStartDay ?? company.FiscalYearStartDay);
+        company.FiscalYearStartMonth = fiscalStartMonth;
+        company.FiscalYearStartDay = fiscalStartDay;
+    }
+
     company.StatusCode = (short)request.StatusCode;
 
     company.UpdatedBy = updatedBy;

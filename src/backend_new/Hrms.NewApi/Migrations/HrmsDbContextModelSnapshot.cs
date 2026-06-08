@@ -248,6 +248,12 @@ namespace Hrms.NewApi.Migrations
                         .HasColumnType("date")
                         .HasColumnName("logdate");
 
+                    b.Property<string>("OriginalAttendanceStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("originalattendancestatus");
+
                     b.Property<DateTimeOffset?>("OriginalCheckInTime")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("originalcheckintime");
@@ -262,13 +268,19 @@ namespace Hrms.NewApi.Migrations
                         .HasColumnType("character varying(500)")
                         .HasColumnName("reason");
 
-                    b.Property<DateTimeOffset>("RequestedCheckInTime")
+                    b.Property<DateTimeOffset?>("RequestedCheckInTime")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("requestedcheckintime");
 
-                    b.Property<DateTimeOffset>("RequestedCheckOutTime")
+                    b.Property<DateTimeOffset?>("RequestedCheckOutTime")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("requestedcheckouttime");
+
+                    b.Property<string>("RequestedCorrectionType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("requestedcorrectiontype");
 
                     b.Property<short>("StatusCode")
                         .ValueGeneratedOnAdd()
@@ -316,7 +328,11 @@ namespace Hrms.NewApi.Migrations
                         {
                             t.HasCheckConstraint("chk_ar_approvalstatus", "approvalstatus IN ('PENDING','APPROVED','REJECTED','CANCELLED')");
 
-                            t.HasCheckConstraint("chk_ar_requested_times", "requestedcheckouttime > requestedcheckintime");
+                            t.HasCheckConstraint("chk_ar_correction_type", "requestedcorrectiontype IN ('FULL_DAY','HALF_DAY','SHORT_DAY','FORGOT_CHECK_IN','FORGOT_CHECK_OUT')");
+
+                            t.HasCheckConstraint("chk_ar_original_status", "originalattendancestatus IN ('ABSENT','HALF_DAY','SHORT_DAY','CHECKED_IN')");
+
+                            t.HasCheckConstraint("chk_ar_requested_times", "requestedcheckintime IS NULL OR requestedcheckouttime IS NULL OR requestedcheckouttime > requestedcheckintime");
                         });
                 });
 
@@ -369,6 +385,18 @@ namespace Hrms.NewApi.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("createdon")
                         .HasDefaultValueSql("NOW()");
+
+                    b.Property<short>("FiscalYearStartDay")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("smallint")
+                        .HasDefaultValue((short)1)
+                        .HasColumnName("fiscalyearstartday");
+
+                    b.Property<short>("FiscalYearStartMonth")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("smallint")
+                        .HasDefaultValue((short)4)
+                        .HasColumnName("fiscalyearstartmonth");
 
                     b.Property<string>("Pincode")
                         .HasMaxLength(20)
@@ -454,6 +482,12 @@ namespace Hrms.NewApi.Migrations
                         .HasColumnType("numeric(4,2)")
                         .HasDefaultValue(4.00m)
                         .HasColumnName("halfday_threshold");
+
+                    b.Property<int>("RegularizationWindowDays")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(30)
+                        .HasColumnName("regularizationwindowdays");
 
                     b.Property<TimeOnly>("ShiftEnd")
                         .ValueGeneratedOnAdd()
@@ -948,6 +982,12 @@ namespace Hrms.NewApi.Migrations
                         .HasDefaultValue(false)
                         .HasColumnName("islate");
 
+                    b.Property<bool>("IsRegularized")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("isregularized");
+
                     b.Property<DateOnly>("LogDate")
                         .HasColumnType("date")
                         .HasColumnName("logdate");
@@ -1035,9 +1075,49 @@ namespace Hrms.NewApi.Migrations
                         .HasColumnType("smallint")
                         .HasColumnName("cycleyear");
 
+                    b.Property<decimal>("FiscalYearCarryForwardIn")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(5, 1)
+                        .HasColumnType("numeric(5,1)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("fiscalyearcarryforwardin");
+
+                    b.Property<string>("LastProcessedMonth")
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)")
+                        .HasColumnName("lastprocessedmonth");
+
                     b.Property<int>("LeaveTypeId")
                         .HasColumnType("integer")
                         .HasColumnName("leavetypeid");
+
+                    b.Property<decimal>("MonthlyAllocation")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(5, 1)
+                        .HasColumnType("numeric(5,1)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("monthlyallocation");
+
+                    b.Property<decimal>("MonthlyCarryForward")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(5, 1)
+                        .HasColumnType("numeric(5,1)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("monthlycarryforward");
+
+                    b.Property<decimal>("MonthlyPending")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(5, 1)
+                        .HasColumnType("numeric(5,1)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("monthlypending");
+
+                    b.Property<decimal>("MonthlyUsed")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(5, 1)
+                        .HasColumnType("numeric(5,1)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("monthlyused");
 
                     b.Property<decimal>("OpeningBalance")
                         .ValueGeneratedOnAdd()

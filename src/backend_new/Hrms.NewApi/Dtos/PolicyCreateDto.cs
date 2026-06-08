@@ -17,4 +17,6 @@ public class PolicyCreateDto
     public TimeSpan ShiftStart { get; set; }
 
     public TimeSpan ShiftEnd { get; set; }
+
+    public int RegularizationWindowDays { get; set; } = 30;
 }

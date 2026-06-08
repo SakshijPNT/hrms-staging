@@ -19,10 +19,6 @@ import {
 } from 'react-icons/io5'
 
 import {
-  BsClipboardCheck,
-} from 'react-icons/bs'
-
-import {
   RiTeamLine,
 } from 'react-icons/ri'
 
@@ -95,14 +91,6 @@ const moduleRoutes: Record<
     ),
   },
 
-  'My Applications': {
-    path: '/my-applications',
-    label: 'My Applications',
-    icon: (
-      <BsClipboardCheck className="menu-icon" />
-    ),
-  },
-
   'My Leaves': {
     path: '/my-leaves',
     label: 'My Leaves',
@@ -150,7 +138,6 @@ const SIDEBAR_MODULE_ORDER: Record<string, number> = {
   Roles: 2,
   'My Leaves': 3,
   'My Approval': 4,
-  'My Applications': 5,
   'My Team': 6,
   Settings: 100,
 }
@@ -164,7 +151,7 @@ const FRONTEND_ONLY_MODULES: ModuleGroup[] = [
         id: 999901,
         moduleName: 'My Leaves',
         description: 'My Leaves',
-        iconUrl: null,
+        iconUrl: undefined,
       },
     ],
   },
@@ -176,7 +163,7 @@ const FRONTEND_ONLY_MODULES: ModuleGroup[] = [
         id: 999902,
         moduleName: 'My Approval',
         description: 'My Approval',
-        iconUrl: null,
+        iconUrl: undefined,
       },
     ],
   },
@@ -242,8 +229,17 @@ function sortSidebarGroups(
 function getSidebarGroups(
   groups: ModuleGroup[]
 ): ModuleGroup[] {
+  const filtered = groups
+    .map((group) => ({
+      ...group,
+      modules: group.modules.filter(
+        (module) => module.moduleName !== 'My Applications',
+      ),
+    }))
+    .filter((group) => group.modules.length > 0)
+
   return sortSidebarGroups(
-    enhanceSidebarGroups(groups)
+    enhanceSidebarGroups(filtered),
   )
 }
 

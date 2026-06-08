@@ -155,7 +155,7 @@ export default function DayDetailModal({
             setDetail(
               mergeWithFallback(
                 {
-                  date,
+                  date: date ?? '',
                   dayType: 'WORKING',
                   holidayName: null,
                   checkInTime: null,
@@ -190,7 +190,7 @@ export default function DayDetailModal({
   if (!open) return null
 
   return (
-    <div className="act-modal-overlay" onClick={onClose}>
+    <div className="act-modal-overlay">
       <div
         className="act-modal calendar-day-modal"
         onClick={(e) => e.stopPropagation()}

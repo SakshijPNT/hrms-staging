@@ -1,21 +1,47 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
   useState,
   type FormEvent,
 } from 'react'
+import type { AxiosError } from 'axios'
 import Layout from './Layout'
 import '../styles/Style.css'
 import Select from 'react-select'
 import { FiSearch, FiEye, FiX, FiCheck } from 'react-icons/fi'
+import api from '../services/api'
+import { useSession } from '../context/SessionContext'
+import { normalizeDate, formatAttendanceTime } from '../utils/attendanceFormat'
+import type { ManagerRegularizationApplication } from '../../types/regularization'
+import { formatCorrectionTypeLabel } from '../../types/regularization'
+import {
+  LeaveBalanceDetailModal,
+  type LeaveBalanceDetail,
+} from '../components/LeaveBalanceDetailModal'
 
 interface LeaveBalanceCard {
-  id: string
+  leaveTypeId: number
   leaveTypeName: string
-  total: number
+  totalAnnual: number
   used: number
   pending: number
 }
+
+interface ManagerLeaveApplication {
+  id: number
+  userId: number
+  userName: string
+  leaveTypeId: number
+  leaveTypeName: string
+  fromDate: string
+  toDate: string
+  reason: string | null
+  approvalStatus: string
+  approverRemark: string | null
+}
+
+type DisplayStatus = 'Approve' | 'Reject' | 'Pending' | 'Cancelled'
 
 interface ApprovalRequest {
   id: number
@@ -26,174 +52,9 @@ interface ApprovalRequest {
   endDate: string
   requestNote: string
   managerNote: string
-  status: 'Approve' | 'Reject' | 'Pending'
+  status: DisplayStatus
+  canReview: boolean
 }
-
-const DUMMY_LEAVE_BALANCES: LeaveBalanceCard[] = [
-  {
-    id: 'casual',
-    leaveTypeName: 'Casual Leave',
-    total: 12,
-    used: 4,
-    pending: 8,
-  },
-  {
-    id: 'sick',
-    leaveTypeName: 'Sick Leave',
-    total: 12,
-    used: 4,
-    pending: 8,
-  },
-  {
-    id: 'paid',
-    leaveTypeName: 'Paid Leave',
-    total: 12,
-    used: 4,
-    pending: 8,
-  },
-]
-
-const DUMMY_APPROVAL_REQUESTS: ApprovalRequest[] = [
-  {
-    id: 1,
-    userId: 'U001',
-    userName: 'Rahul G.',
-    requestType: 'Paid Leave',
-    startDate: '13/07/2026',
-    endDate: '13/07/2026',
-    requestNote: 'Out of Town',
-    managerNote: '-- --',
-    status: 'Approve',
-  },
-  {
-    id: 2,
-    userId: 'U001',
-    userName: 'Sakshi Pillai',
-    requestType: 'Casual Leave',
-    startDate: '13/07/2026',
-    endDate: '13/07/2026',
-    requestNote: 'Out of Town',
-    managerNote: '-- --',
-    status: 'Pending',
-  },
-  {
-    id: 3,
-    userId: 'U001',
-    userName: 'David M.',
-    requestType: 'Sick Leave',
-    startDate: '13/07/2026',
-    endDate: '13/07/2026',
-    requestNote: 'Not feeling well',
-    managerNote: '-- --',
-    status: 'Approve',
-  },
-  {
-    id: 4,
-    userId: 'U001',
-    userName: 'Aryan D.',
-    requestType: 'Casual Leave',
-    startDate: '13/07/2026',
-    endDate: '13/07/2026',
-    requestNote: 'Out of Town',
-    managerNote: 'Client Meeting',
-    status: 'Reject',
-  },
-  {
-    id: 5,
-    userId: 'U001',
-    userName: 'John Doe',
-    requestType: 'Paid Leave',
-    startDate: '13/07/2026',
-    endDate: '13/07/2026',
-    requestNote: 'Family function',
-    managerNote: '-- --',
-    status: 'Pending',
-  },
-  {
-    id: 6,
-    userId: 'U002',
-    userName: 'Priya Sharma',
-    requestType: 'Sick Leave',
-    startDate: '14/07/2026',
-    endDate: '14/07/2026',
-    requestNote: 'Not feeling well',
-    managerNote: '-- --',
-    status: 'Approve',
-  },
-  {
-    id: 7,
-    userId: 'U002',
-    userName: 'Amit Verma',
-    requestType: 'Paid Leave',
-    startDate: '15/07/2026',
-    endDate: '16/07/2026',
-    requestNote: 'Out of Town',
-    managerNote: '-- --',
-    status: 'Pending',
-  },
-  {
-    id: 8,
-    userId: 'U003',
-    userName: 'Neha Kapoor',
-    requestType: 'Casual Leave',
-    startDate: '17/07/2026',
-    endDate: '17/07/2026',
-    requestNote: 'Personal work',
-    managerNote: 'Client Meeting',
-    status: 'Reject',
-  },
-  {
-    id: 9,
-    userId: 'U003',
-    userName: 'Rohan Mehta',
-    requestType: 'Sick Leave',
-    startDate: '18/07/2026',
-    endDate: '18/07/2026',
-    requestNote: 'Not feeling well',
-    managerNote: '-- --',
-    status: 'Approve',
-  },
-  {
-    id: 10,
-    userId: 'U004',
-    userName: 'Anita Roy',
-    requestType: 'Paid Leave',
-    startDate: '19/07/2026',
-    endDate: '20/07/2026',
-    requestNote: 'Out of Town',
-    managerNote: '-- --',
-    status: 'Pending',
-  },
-  {
-    id: 11,
-    userId: 'U004',
-    userName: 'Vikram Singh',
-    requestType: 'Casual Leave',
-    startDate: '21/07/2026',
-    endDate: '21/07/2026',
-    requestNote: 'Out of Town',
-    managerNote: '-- --',
-    status: 'Approve',
-  },
-  {
-    id: 12,
-    userId: 'U005',
-    userName: 'Kavya Nair',
-    requestType: 'Sick Leave',
-    startDate: '22/07/2026',
-    endDate: '22/07/2026',
-    requestNote: 'Not feeling well',
-    managerNote: 'Client Meeting',
-    status: 'Reject',
-  },
-]
-
-const TYPE_FILTER_OPTIONS = [
-  { value: 'all', label: 'All Type' },
-  { value: 'casual', label: 'Casual Leave' },
-  { value: 'sick', label: 'Sick Leave' },
-  { value: 'paid', label: 'Paid Leave' },
-]
 
 const STATUS_FILTER_OPTIONS = [
   { value: 'all', label: 'All Status' },
@@ -202,35 +63,229 @@ const STATUS_FILTER_OPTIONS = [
   { value: 'pending', label: 'Pending' },
 ]
 
+function formatDisplayDate(value: string): string {
+  const normalized = normalizeDate(value)
+  if (!normalized) {
+    return value
+  }
+
+  const [year, month, day] = normalized.split('-')
+  return `${day}/${month}/${year}`
+}
+
+function mapApprovalStatus(status: string): DisplayStatus {
+  switch (status.toUpperCase()) {
+    case 'APPROVED':
+      return 'Approve'
+    case 'REJECTED':
+      return 'Reject'
+    case 'CANCELLED':
+      return 'Cancelled'
+    default:
+      return 'Pending'
+  }
+}
+
+function mapApplication(item: ManagerLeaveApplication): ApprovalRequest {
+  return {
+    id: item.id,
+    userId: String(item.userId),
+    userName: item.userName,
+    requestType: item.leaveTypeName,
+    startDate: formatDisplayDate(item.fromDate),
+    endDate: formatDisplayDate(item.toDate),
+    requestNote: item.reason?.trim() || '-- --',
+    managerNote: item.approverRemark?.trim() || '-- --',
+    status: mapApprovalStatus(item.approvalStatus),
+    canReview: item.approvalStatus.toUpperCase() === 'PENDING',
+  }
+}
+
+function formatLeaveDays(value: number) {
+  const rounded = Math.round(value * 100) / 100
+  if (Number.isInteger(rounded)) {
+    return String(rounded).padStart(2, '0')
+  }
+
+  return rounded.toFixed(2)
+}
+
+type ApprovalTab = 'leave' | 'regularization'
+
 export function MyApprovalPage() {
-  const [approvalRequests, setApprovalRequests] =
-    useState<ApprovalRequest[]>(DUMMY_APPROVAL_REQUESTS)
+  return (
+    <Layout title="My Approval">
+      <MyApprovalContent />
+    </Layout>
+  )
+}
+
+function MyApprovalContent() {
+  const session = useSession()
+  const timezone = session.timezone || 'Asia/Kolkata'
+
+  const [approvalTab, setApprovalTab] = useState<ApprovalTab>('leave')
+  const [leaveBalances, setLeaveBalances] = useState<LeaveBalanceCard[]>([])
+  const [balancesLoading, setBalancesLoading] = useState(true)
+  const [approvalRequests, setApprovalRequests] = useState<ApprovalRequest[]>(
+    [],
+  )
+  const [requestsLoading, setRequestsLoading] = useState(true)
+  const [actionId, setActionId] = useState<number | null>(null)
 
   const [typeFilter, setTypeFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
   const [search, setSearch] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
-  const [viewModalOpen, setViewModalOpen] =
-    useState(false)
-  const [approveModalOpen, setApproveModalOpen] =
-    useState(false)
-  const [rejectModalOpen, setRejectModalOpen] =
-    useState(false)
+  const [viewModalOpen, setViewModalOpen] = useState(false)
+  const [approveModalOpen, setApproveModalOpen] = useState(false)
+  const [rejectModalOpen, setRejectModalOpen] = useState(false)
   const [selectedRequest, setSelectedRequest] =
     useState<ApprovalRequest | null>(null)
   const [managerNote, setManagerNote] = useState('')
   const [actionError, setActionError] = useState('')
+  const [balanceDetailOpen, setBalanceDetailOpen] = useState(false)
+  const [balanceDetailLoading, setBalanceDetailLoading] = useState(false)
+  const [balanceDetailError, setBalanceDetailError] = useState('')
+  const [balanceDetail, setBalanceDetail] =
+    useState<LeaveBalanceDetail | null>(null)
+
+  const [regularizationItems, setRegularizationItems] = useState<
+    ManagerRegularizationApplication[]
+  >([])
+  const [regularizationLoading, setRegularizationLoading] = useState(true)
+  const [regReviewTarget, setRegReviewTarget] =
+    useState<ManagerRegularizationApplication | null>(null)
+  const [regReviewAction, setRegReviewAction] = useState<
+    'approve' | 'reject' | null
+  >(null)
+  const [regActionError, setRegActionError] = useState('')
 
   const rowsPerPage = 10
 
   const isModalOpen =
     viewModalOpen ||
     approveModalOpen ||
-    rejectModalOpen
+    rejectModalOpen ||
+    balanceDetailOpen ||
+    regReviewTarget != null
+
+  const typeFilterOptions = useMemo(() => {
+    const uniqueTypes = Array.from(
+      new Set(approvalRequests.map((request) => request.requestType)),
+    ).sort((a, b) => a.localeCompare(b))
+
+    return [
+      { value: 'all', label: 'All Type' },
+      ...uniqueTypes.map((leaveTypeName) => ({
+        value: leaveTypeName.toLowerCase(),
+        label: leaveTypeName,
+      })),
+    ]
+  }, [approvalRequests])
+
+  const fetchLeaveBalances = useCallback(async () => {
+    setBalancesLoading(true)
+
+    try {
+      const response = await api.get<
+        {
+          leaveTypeId: number
+          leaveTypeName: string
+          totalAnnual: number
+          used: number
+          pending: number
+        }[]
+      >('/user-leaves/balances')
+
+      setLeaveBalances(
+        (response.data ?? []).map((item) => ({
+          leaveTypeId: item.leaveTypeId,
+          leaveTypeName: item.leaveTypeName,
+          totalAnnual: Number(item.totalAnnual),
+          used: Number(item.used),
+          pending: Number(item.pending),
+        })),
+      )
+    } catch (fetchError) {
+      console.error('Failed to fetch leave balances', fetchError)
+      setLeaveBalances([])
+    } finally {
+      setBalancesLoading(false)
+    }
+  }, [])
+
+  const fetchApprovalRequests = useCallback(async () => {
+    setRequestsLoading(true)
+
+    try {
+      const response = await api.get<ManagerLeaveApplication[]>(
+        '/user-leaves/pending-approvals',
+      )
+
+      setApprovalRequests((response.data ?? []).map(mapApplication))
+    } catch (fetchError) {
+      console.error('Failed to fetch leave approvals', fetchError)
+      setApprovalRequests([])
+    } finally {
+      setRequestsLoading(false)
+    }
+  }, [])
+
+  const fetchRegularizationApprovals = useCallback(async () => {
+    setRegularizationLoading(true)
+
+    try {
+      const response = await api.get<ManagerRegularizationApplication[]>(
+        '/regularization/pending-approvals',
+      )
+
+      setRegularizationItems(
+        (response.data ?? []).map((item) => ({
+          ...item,
+          employeeName:
+            item.employeeName ??
+            (item as { EmployeeName?: string }).EmployeeName ??
+            'Unknown',
+          employeeEmail:
+            item.employeeEmail ??
+            (item as { EmployeeEmail?: string }).EmployeeEmail ??
+            '',
+          logDate: normalizeDate(item.logDate),
+          requestedCorrectionType:
+            item.requestedCorrectionType ??
+            (item as { RequestedCorrectionType?: string })
+              .RequestedCorrectionType ??
+            '',
+          reason:
+            item.reason ??
+            (item as { Reason?: string }).Reason ??
+            '',
+        })),
+      )
+    } catch (fetchError) {
+      console.error('Failed to fetch regularization approvals', fetchError)
+      setRegularizationItems([])
+    } finally {
+      setRegularizationLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void fetchLeaveBalances()
+    void fetchApprovalRequests()
+    void fetchRegularizationApprovals()
+  }, [fetchApprovalRequests, fetchLeaveBalances, fetchRegularizationApprovals])
+
+  useEffect(() => {
+    if (regularizationItems.length > 0 && approvalRequests.length === 0) {
+      setApprovalTab('regularization')
+    }
+  }, [regularizationItems.length, approvalRequests.length])
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [typeFilter, statusFilter, search])
+  }, [typeFilter, statusFilter, search, approvalTab])
 
   useEffect(() => {
     if (isModalOpen) {
@@ -250,9 +305,7 @@ export function MyApprovalPage() {
     return approvalRequests.filter((request) => {
       const matchesType =
         typeFilter === 'all' ||
-        request.requestType
-          .toLowerCase()
-          .includes(typeFilter)
+        request.requestType.toLowerCase().includes(typeFilter)
 
       const matchesStatus =
         statusFilter === 'all' ||
@@ -267,8 +320,9 @@ export function MyApprovalPage() {
     })
   }, [approvalRequests, typeFilter, statusFilter, search])
 
-  const totalPages = Math.ceil(
-    filteredRequests.length / rowsPerPage
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredRequests.length / rowsPerPage),
   )
 
   const indexOfLastRow = currentPage * rowsPerPage
@@ -276,10 +330,14 @@ export function MyApprovalPage() {
 
   const currentRows = filteredRequests.slice(
     indexOfFirstRow,
-    indexOfLastRow
+    indexOfLastRow,
   )
 
   function getStatusClass(status: ApprovalRequest['status']) {
+    if (status === 'Cancelled') {
+      return 'reject'
+    }
+
     return status.toLowerCase()
   }
 
@@ -294,6 +352,10 @@ export function MyApprovalPage() {
   }
 
   function openApproveModal(request: ApprovalRequest) {
+    if (!request.canReview) {
+      return
+    }
+
     setSelectedRequest(request)
     setManagerNote('')
     setActionError('')
@@ -308,6 +370,10 @@ export function MyApprovalPage() {
   }
 
   function openRejectModal(request: ApprovalRequest) {
+    if (!request.canReview) {
+      return
+    }
+
     setSelectedRequest(request)
     setManagerNote('')
     setActionError('')
@@ -321,94 +387,276 @@ export function MyApprovalPage() {
     setActionError('')
   }
 
-  function handleApproveSubmit(
-    e: FormEvent<HTMLFormElement>
-  ) {
+  async function handleApproveSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
 
-    if (!selectedRequest) return
-
-    setApprovalRequests((current) =>
-      current.map((request) =>
-        request.id === selectedRequest.id
-          ? {
-            ...request,
-            status: 'Approve',
-            managerNote:
-              managerNote.trim() || '-- --',
-          }
-          : request
-      )
-    )
-
-    alert('Leave request approved successfully')
-    closeApproveModal()
-  }
-
-  function handleRejectSubmit(
-    e: FormEvent<HTMLFormElement>
-  ) {
-    e.preventDefault()
-
-    if (!managerNote.trim()) {
-      setActionError(
-        'Rejection note is required.'
-      )
+    if (!selectedRequest) {
       return
     }
 
-    if (!selectedRequest) return
+    setActionId(selectedRequest.id)
+    setActionError('')
 
-    setApprovalRequests((current) =>
-      current.map((request) =>
-        request.id === selectedRequest.id
-          ? {
-            ...request,
-            status: 'Reject',
-            managerNote: managerNote.trim(),
-          }
-          : request
+    try {
+      await api.patch(
+        `/user-leaves/applications/${selectedRequest.id}/approve`,
+        { approverRemark: managerNote.trim() || null },
       )
-    )
 
-    alert('Leave request rejected successfully')
-    closeRejectModal()
+      closeApproveModal()
+      await fetchApprovalRequests()
+      await fetchLeaveBalances()
+    } catch (err) {
+      const axiosError = err as AxiosError<{ message?: string }>
+      setActionError(
+        axiosError.response?.data?.message ??
+          'Failed to approve leave request.',
+      )
+    } finally {
+      setActionId(null)
+    }
   }
 
-  return (
-    <Layout title="My Approval">
-      <div className="act-page">
-        <div className="act-stats leaves-stats">
-          {DUMMY_LEAVE_BALANCES.map((leave) => (
-            <div
-              key={leave.id}
-              className={`act-leave-card ${leave.id}`}
-            >
-              <div className="act-leave-card-content">
-                <h3>
-                  {leave.leaveTypeName}:{' '}
-                  <span className="act-leave-card-total">
-                    {leave.total}
-                  </span>
-                </h3>
+  async function handleRejectSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault()
 
-                <div className="act-leave-card-meta">
-                  <span>
-                    Used:{' '}
-                    {String(leave.used).padStart(2, '0')}
-                  </span>
-                  <span>
-                    Pending:{' '}
-                    {String(leave.pending).padStart(2, '0')}
-                  </span>
+    if (!managerNote.trim()) {
+      setActionError('Rejection note is required.')
+      return
+    }
+
+    if (!selectedRequest) {
+      return
+    }
+
+    setActionId(selectedRequest.id)
+    setActionError('')
+
+    try {
+      await api.patch(
+        `/user-leaves/applications/${selectedRequest.id}/reject`,
+        { approverRemark: managerNote.trim() },
+      )
+
+      closeRejectModal()
+      await fetchApprovalRequests()
+    } catch (err) {
+      const axiosError = err as AxiosError<{ message?: string }>
+      setActionError(
+        axiosError.response?.data?.message ??
+          'Failed to reject leave request.',
+      )
+    } finally {
+      setActionId(null)
+    }
+  }
+
+  async function openBalanceDetail(leaveTypeId: number) {
+    setBalanceDetailOpen(true)
+    setBalanceDetailLoading(true)
+    setBalanceDetailError('')
+    setBalanceDetail(null)
+
+    try {
+      const response = await api.get<{
+        leaveTypeId: number
+        leaveTypeName: string
+        annualUsed: number
+        annualPending: number
+        monthlyUsed: number
+        monthlyPending: number
+      }>(`/user-leaves/balances/${leaveTypeId}/detail`)
+
+      setBalanceDetail({
+        leaveTypeId: response.data.leaveTypeId,
+        leaveTypeName: response.data.leaveTypeName,
+        annualUsed: Number(response.data.annualUsed),
+        annualPending: Number(response.data.annualPending),
+        monthlyUsed: Number(response.data.monthlyUsed),
+        monthlyPending: Number(response.data.monthlyPending),
+      })
+    } catch (fetchError) {
+      console.error('Failed to fetch leave balance detail', fetchError)
+      setBalanceDetailError('Unable to load leave balance details.')
+    } finally {
+      setBalanceDetailLoading(false)
+    }
+  }
+
+  function closeBalanceDetail() {
+    setBalanceDetailOpen(false)
+    setBalanceDetailError('')
+    setBalanceDetail(null)
+  }
+
+  function openRegReview(
+    item: ManagerRegularizationApplication,
+    action: 'approve' | 'reject',
+  ) {
+    setRegReviewTarget(item)
+    setRegReviewAction(action)
+    setManagerNote('')
+    setRegActionError('')
+  }
+
+  function closeRegReview() {
+    setRegReviewTarget(null)
+    setRegReviewAction(null)
+    setManagerNote('')
+    setRegActionError('')
+  }
+
+  async function handleRegReviewSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+
+    if (!regReviewTarget || !regReviewAction) {
+      return
+    }
+
+    if (regReviewAction === 'reject' && !managerNote.trim()) {
+      setRegActionError('Rejection note is required.')
+      return
+    }
+
+    setActionId(regReviewTarget.id)
+    setRegActionError('')
+
+    try {
+      await api.patch(
+        `/regularization/applications/${regReviewTarget.id}/${regReviewAction}`,
+        { approverRemark: managerNote.trim() || null },
+      )
+
+      closeRegReview()
+      await fetchRegularizationApprovals()
+    } catch (err) {
+      const axiosError = err as AxiosError<{ message?: string }>
+      setRegActionError(
+        axiosError.response?.data?.message ??
+          `Failed to ${regReviewAction} regularization request.`,
+      )
+    } finally {
+      setActionId(null)
+    }
+  }
+
+  const filteredRegularizations = useMemo(() => {
+    const query = search.toLowerCase().trim()
+
+    return regularizationItems.filter((item) => {
+      if (!query) {
+        return true
+      }
+
+      return (
+        item.employeeName.toLowerCase().includes(query) ||
+        item.employeeEmail.toLowerCase().includes(query) ||
+        normalizeDate(item.logDate).includes(query)
+      )
+    })
+  }, [regularizationItems, search])
+
+  const regTotalPages = Math.max(
+    1,
+    Math.ceil(filteredRegularizations.length / rowsPerPage),
+  )
+
+  const regIndexOfLastRow = currentPage * rowsPerPage
+  const regIndexOfFirstRow = regIndexOfLastRow - rowsPerPage
+  const currentRegRows = filteredRegularizations.slice(
+    regIndexOfFirstRow,
+    regIndexOfLastRow,
+  )
+
+  return (
+    <div className="act-page">
+      <div className="act-page-header">
+        <div>
+          <h1 className="act-title">My Approval</h1>
+          <p className="act-subtitle">
+            Review leave and regularization requests from your team.
+          </p>
+        </div>
+      </div>
+
+      <div className="act-stats leaves-stats">
+          {balancesLoading ? (
+            <div className="act-leave-card leaves-stats-loading">
+              Loading leave balances...
+            </div>
+          ) : leaveBalances.length === 0 ? (
+            <div className="act-leave-card leaves-stats-empty">
+              No leave types configured for your company.
+            </div>
+          ) : (
+            leaveBalances.map((leave) => (
+              <div key={leave.leaveTypeId} className="act-leave-card">
+                <div className="act-leave-card-content">
+                  <h3>
+                    {leave.leaveTypeName}:{' '}
+                    <span className="act-leave-card-total">
+                      {formatLeaveDays(leave.totalAnnual)}
+                    </span>
+                  </h3>
+
+                  <div className="act-leave-card-meta">
+                    <button
+                      type="button"
+                      className="act-leave-card-stat-btn"
+                      onClick={() =>
+                        void openBalanceDetail(leave.leaveTypeId)
+                      }
+                    >
+                      Used: {formatLeaveDays(leave.used)}
+                    </button>
+                    <button
+                      type="button"
+                      className="act-leave-card-stat-btn"
+                      onClick={() =>
+                        void openBalanceDetail(leave.leaveTypeId)
+                      }
+                    >
+                      Pending: {formatLeaveDays(leave.pending)}
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))
+          )}
+        </div>
+
+        <div className="approval-tabs">
+          <button
+            type="button"
+            className={`approval-tab${approvalTab === 'leave' ? ' approval-tab--active' : ''}`}
+            onClick={() => {
+              setApprovalTab('leave')
+              setCurrentPage(1)
+            }}
+          >
+            Leave Requests
+          </button>
+          <button
+            type="button"
+            className={`approval-tab${approvalTab === 'regularization' ? ' approval-tab--active' : ''}`}
+            onClick={() => {
+              setApprovalTab('regularization')
+              setCurrentPage(1)
+            }}
+          >
+            Regularization
+            {regularizationItems.length > 0 && (
+              <span className="approval-tab-badge">
+                {regularizationItems.length}
+              </span>
+            )}
+          </button>
         </div>
 
         <div className="act-toolbar leaves-toolbar approval-toolbar">
           <div className="leaves-filters approval-filters">
+            {approvalTab === 'leave' && (
+              <>
             <div className="leaves-filter-field">
               <Select
                 menuPortalTarget={document.body}
@@ -416,17 +664,14 @@ export function MyApprovalPage() {
                 menuPlacement="auto"
                 menuShouldScrollIntoView={false}
                 classNamePrefix="act-select"
-                options={TYPE_FILTER_OPTIONS}
+                options={typeFilterOptions}
                 value={
-                  TYPE_FILTER_OPTIONS.find(
-                    (option) =>
-                      option.value === typeFilter
-                  ) || TYPE_FILTER_OPTIONS[0]
+                  typeFilterOptions.find(
+                    (option) => option.value === typeFilter,
+                  ) || typeFilterOptions[0]
                 }
                 onChange={(selected) =>
-                  setTypeFilter(
-                    selected ? String(selected.value) : 'all'
-                  )
+                  setTypeFilter(selected ? String(selected.value) : 'all')
                 }
               />
             </div>
@@ -441,33 +686,35 @@ export function MyApprovalPage() {
                 options={STATUS_FILTER_OPTIONS}
                 value={
                   STATUS_FILTER_OPTIONS.find(
-                    (option) =>
-                      option.value === statusFilter
+                    (option) => option.value === statusFilter,
                   ) || STATUS_FILTER_OPTIONS[0]
                 }
                 onChange={(selected) =>
-                  setStatusFilter(
-                    selected ? String(selected.value) : 'all'
-                  )
+                  setStatusFilter(selected ? String(selected.value) : 'all')
                 }
               />
             </div>
+              </>
+            )}
 
             <div className="approval-search-wrapper">
               <FiSearch className="act-search-icon" />
               <input
                 className="act-search"
                 type="text"
-                placeholder="Search by User"
-                value={search}
-                onChange={(e) =>
-                  setSearch(e.target.value)
+                placeholder={
+                  approvalTab === 'leave'
+                    ? 'Search by User'
+                    : 'Search regularization requests'
                 }
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
               />
             </div>
           </div>
         </div>
 
+        {approvalTab === 'leave' ? (
         <div className="act-table-wrapper">
           <table className="act-table approval-table">
             <thead>
@@ -483,12 +730,15 @@ export function MyApprovalPage() {
             </thead>
 
             <tbody>
-              {filteredRequests.length === 0 ? (
+              {requestsLoading ? (
                 <tr>
-                  <td
-                    colSpan={7}
-                    className="act-empty"
-                  >
+                  <td colSpan={7} className="act-empty">
+                    Loading approval requests...
+                  </td>
+                </tr>
+              ) : filteredRequests.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="act-empty">
                     No approval requests found.
                   </td>
                 </tr>
@@ -514,9 +764,7 @@ export function MyApprovalPage() {
                           className="approval-action-btn view"
                           title="View request"
                           aria-label={`View request for ${request.userName}`}
-                          onClick={() =>
-                            openViewModal(request)
-                          }
+                          onClick={() => openViewModal(request)}
                         >
                           <FiEye />
                         </button>
@@ -526,9 +774,8 @@ export function MyApprovalPage() {
                           className="approval-action-btn reject"
                           title="Reject request"
                           aria-label={`Reject request for ${request.userName}`}
-                          onClick={() =>
-                            openRejectModal(request)
-                          }
+                          disabled={!request.canReview || actionId === request.id}
+                          onClick={() => openRejectModal(request)}
                         >
                           <FiX />
                         </button>
@@ -538,9 +785,8 @@ export function MyApprovalPage() {
                           className="approval-action-btn approve"
                           title="Approve request"
                           aria-label={`Approve request for ${request.userName}`}
-                          onClick={() =>
-                            openApproveModal(request)
-                          }
+                          disabled={!request.canReview || actionId === request.id}
+                          onClick={() => openApproveModal(request)}
                         >
                           <FiCheck />
                         </button>
@@ -552,11 +798,10 @@ export function MyApprovalPage() {
             </tbody>
           </table>
 
-          {filteredRequests.length > 0 && (
+          {!requestsLoading && filteredRequests.length > 0 && (
             <div className="role-pagination">
               <div className="pagination-info">
-                Showing {currentRows.length} of{' '}
-                {filteredRequests.length}
+                Showing {currentRows.length} of {filteredRequests.length}
               </div>
 
               <div className="pagination-controls">
@@ -564,9 +809,7 @@ export function MyApprovalPage() {
                   type="button"
                   className="pagination-btn"
                   disabled={currentPage === 1}
-                  onClick={() =>
-                    setCurrentPage((prev) => prev - 1)
-                  }
+                  onClick={() => setCurrentPage((prev) => prev - 1)}
                 >
                   &#8249;
                 </button>
@@ -578,12 +821,8 @@ export function MyApprovalPage() {
                 <button
                   type="button"
                   className="pagination-btn"
-                  disabled={
-                    currentPage === totalPages
-                  }
-                  onClick={() =>
-                    setCurrentPage((prev) => prev + 1)
-                  }
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage((prev) => prev + 1)}
                 >
                   &#8250;
                 </button>
@@ -591,17 +830,123 @@ export function MyApprovalPage() {
             </div>
           )}
         </div>
+        ) : (
+        <div className="act-table-wrapper">
+          <table className="act-table approval-table">
+            <thead>
+              <tr>
+                <th>Employee</th>
+                <th>Date</th>
+                <th>Actual IN</th>
+                <th>Actual OUT</th>
+                <th>Requested IN</th>
+                <th>Requested OUT</th>
+                <th>Correction</th>
+                <th>Reason</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {regularizationLoading ? (
+                <tr>
+                  <td colSpan={9} className="act-empty">
+                    Loading regularization requests...
+                  </td>
+                </tr>
+              ) : filteredRegularizations.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="act-empty">
+                    No pending regularization requests.
+                  </td>
+                </tr>
+              ) : (
+                currentRegRows.map((item) => (
+                  <tr key={item.id}>
+                    <td>
+                      <div>{item.employeeName}</div>
+                      <div className="act-date">{item.employeeEmail}</div>
+                    </td>
+                    <td>{formatDisplayDate(normalizeDate(item.logDate))}</td>
+                    <td>
+                      {formatAttendanceTime(item.originalCheckInTime, timezone)}
+                    </td>
+                    <td>
+                      {formatAttendanceTime(item.originalCheckOutTime, timezone)}
+                    </td>
+                    <td>
+                      {formatAttendanceTime(item.requestedCheckInTime, timezone)}
+                    </td>
+                    <td>
+                      {formatAttendanceTime(item.requestedCheckOutTime, timezone)}
+                    </td>
+                    <td>
+                      {formatCorrectionTypeLabel(item.requestedCorrectionType)}
+                    </td>
+                    <td>{item.reason}</td>
+                    <td>
+                      <div className="table-action-group approval-action-group">
+                        <button
+                          type="button"
+                          className="approval-action-btn reject"
+                          title="Reject request"
+                          disabled={actionId === item.id}
+                          onClick={() => openRegReview(item, 'reject')}
+                        >
+                          <FiX />
+                        </button>
+                        <button
+                          type="button"
+                          className="approval-action-btn approve"
+                          title="Approve request"
+                          disabled={actionId === item.id}
+                          onClick={() => openRegReview(item, 'approve')}
+                        >
+                          <FiCheck />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+
+          {!regularizationLoading && filteredRegularizations.length > 0 && (
+            <div className="role-pagination">
+              <div className="pagination-info">
+                Showing {currentRegRows.length} of {filteredRegularizations.length}
+              </div>
+              <div className="pagination-controls">
+                <button
+                  type="button"
+                  className="pagination-btn"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage((prev) => prev - 1)}
+                >
+                  &#8249;
+                </button>
+                <span className="pagination-text">
+                  Page {currentPage} of {regTotalPages}
+                </span>
+                <button
+                  type="button"
+                  className="pagination-btn"
+                  disabled={currentPage === regTotalPages}
+                  onClick={() => setCurrentPage((prev) => prev + 1)}
+                >
+                  &#8250;
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+        )}
 
         {approveModalOpen && selectedRequest && (
-          <div
-            className="act-modal-overlay"
-            onClick={closeApproveModal}
-          >
+          <div className="act-modal-overlay">
             <div
               className="act-modal modal-sm"
-              onClick={(e) =>
-                e.stopPropagation()
-              }
+              onClick={(e) => e.stopPropagation()}
             >
               <div className="act-modal-header">
                 <h2>Approval Request</h2>
@@ -636,18 +981,12 @@ export function MyApprovalPage() {
                       className="approval-manager-note"
                       placeholder="-Enter Text-"
                       value={managerNote}
-                      onChange={(e) =>
-                        setManagerNote(e.target.value)
-                      }
+                      onChange={(e) => setManagerNote(e.target.value)}
                     />
                   </label>
                 </div>
 
-                {actionError && (
-                  <div className="form-error">
-                    {actionError}
-                  </div>
-                )}
+                {actionError && <div className="form-error">{actionError}</div>}
               </form>
 
               <div className="act-modal-actions">
@@ -655,6 +994,7 @@ export function MyApprovalPage() {
                   type="button"
                   className="act-cancel-btn"
                   onClick={closeApproveModal}
+                  disabled={actionId === selectedRequest.id}
                 >
                   Cancel
                 </button>
@@ -663,6 +1003,7 @@ export function MyApprovalPage() {
                   type="submit"
                   form="approval-form"
                   className="act-submit-btn"
+                  disabled={actionId === selectedRequest.id}
                 >
                   Approve
                 </button>
@@ -672,15 +1013,10 @@ export function MyApprovalPage() {
         )}
 
         {rejectModalOpen && selectedRequest && (
-          <div
-            className="act-modal-overlay"
-            onClick={closeRejectModal}
-          >
+          <div className="act-modal-overlay">
             <div
               className="act-modal modal-sm"
-              onClick={(e) =>
-                e.stopPropagation()
-              }
+              onClick={(e) => e.stopPropagation()}
             >
               <div className="act-modal-header">
                 <h2>Rejection Request</h2>
@@ -710,9 +1046,7 @@ export function MyApprovalPage() {
 
                 <div className="act-form-row">
                   <label className="act-form-field">
-                    <span>
-                      Rejection Note / Manager Note *
-                    </span>
+                    <span>Rejection Note / Manager Note *</span>
                     <textarea
                       className="approval-rejection-note"
                       placeholder="-Enter Text-"
@@ -727,11 +1061,7 @@ export function MyApprovalPage() {
                   </label>
                 </div>
 
-                {actionError && (
-                  <div className="form-error">
-                    {actionError}
-                  </div>
-                )}
+                {actionError && <div className="form-error">{actionError}</div>}
               </form>
 
               <div className="act-modal-actions">
@@ -739,6 +1069,7 @@ export function MyApprovalPage() {
                   type="button"
                   className="act-cancel-btn"
                   onClick={closeRejectModal}
+                  disabled={actionId === selectedRequest.id}
                 >
                   Cancel
                 </button>
@@ -747,6 +1078,7 @@ export function MyApprovalPage() {
                   type="submit"
                   form="rejection-form"
                   className="act-reject-btn"
+                  disabled={actionId === selectedRequest.id}
                 >
                   Reject
                 </button>
@@ -756,15 +1088,10 @@ export function MyApprovalPage() {
         )}
 
         {viewModalOpen && selectedRequest && (
-          <div
-            className="act-modal-overlay"
-            onClick={closeViewModal}
-          >
+          <div className="act-modal-overlay">
             <div
               className="act-modal modal-md"
-              onClick={(e) =>
-                e.stopPropagation()
-              }
+              onClick={(e) => e.stopPropagation()}
             >
               <div className="act-modal-header">
                 <h2>Leave Request Details</h2>
@@ -779,10 +1106,6 @@ export function MyApprovalPage() {
               </div>
 
               <div className="act-modal-form">
-                {/* <h3 className="act-form-section-title">
-                  Basic Details
-                </h3> */}
-
                 <div className="act-form-row">
                   <label className="act-form-field">
                     <span>User ID</span>
@@ -886,7 +1209,150 @@ export function MyApprovalPage() {
             </div>
           </div>
         )}
+
+        {regReviewTarget && regReviewAction && (
+          <div className="act-modal-overlay">
+            <div
+              className="act-modal modal-md"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="act-modal-header">
+                <h2>
+                  {regReviewAction === 'approve' ? 'Approve' : 'Reject'}{' '}
+                  Regularization
+                </h2>
+                <button
+                  type="button"
+                  className="act-modal-close"
+                  onClick={closeRegReview}
+                >
+                  &times;
+                </button>
+              </div>
+
+              <form
+                className="act-modal-form approval-modal-form"
+                onSubmit={handleRegReviewSubmit}
+              >
+                <div className="reg-summary-grid">
+                  <label className="act-form-field">
+                    <span>Employee</span>
+                    <input
+                      type="text"
+                      readOnly
+                      className="approval-detail-readonly"
+                      value={regReviewTarget.employeeName}
+                    />
+                  </label>
+                  <label className="act-form-field">
+                    <span>Date</span>
+                    <input
+                      type="text"
+                      readOnly
+                      className="approval-detail-readonly"
+                      value={formatDisplayDate(normalizeDate(regReviewTarget.logDate))}
+                    />
+                  </label>
+                  <label className="act-form-field">
+                    <span>Correction</span>
+                    <input
+                      type="text"
+                      readOnly
+                      className="approval-detail-readonly"
+                      value={formatCorrectionTypeLabel(
+                        regReviewTarget.requestedCorrectionType,
+                      )}
+                    />
+                  </label>
+                  <label className="act-form-field">
+                    <span>Requested Check In</span>
+                    <input
+                      type="text"
+                      readOnly
+                      className="approval-detail-readonly"
+                      value={formatAttendanceTime(
+                        regReviewTarget.requestedCheckInTime,
+                        timezone,
+                      )}
+                    />
+                  </label>
+                  <label className="act-form-field">
+                    <span>Requested Check Out</span>
+                    <input
+                      type="text"
+                      readOnly
+                      className="approval-detail-readonly"
+                      value={formatAttendanceTime(
+                        regReviewTarget.requestedCheckOutTime,
+                        timezone,
+                      )}
+                    />
+                  </label>
+                </div>
+
+                <div className="approval-employee-reason">
+                  <span>Employee Reason</span>
+                  <p className="approval-employee-reason-value">
+                    {regReviewTarget.reason}
+                  </p>
+                </div>
+
+                <label className="act-form-field">
+                  <span>
+                    Manager Note
+                    {regReviewAction === 'reject' ? ' *' : ''}
+                  </span>
+                  <textarea
+                    className="approval-manager-note"
+                    placeholder="-Enter Text-"
+                    value={managerNote}
+                    onChange={(e) => {
+                      setManagerNote(e.target.value)
+                      if (regActionError) {
+                        setRegActionError('')
+                      }
+                    }}
+                  />
+                </label>
+
+                {regActionError && (
+                  <div className="form-error">{regActionError}</div>
+                )}
+
+                <div className="act-modal-actions">
+                  <button
+                    type="button"
+                    className="act-cancel-btn"
+                    onClick={closeRegReview}
+                    disabled={actionId === regReviewTarget.id}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className={
+                      regReviewAction === 'approve'
+                        ? 'act-submit-btn'
+                        : 'act-reject-btn'
+                    }
+                    disabled={actionId === regReviewTarget.id}
+                  >
+                    {regReviewAction === 'approve' ? 'Approve' : 'Reject'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        <LeaveBalanceDetailModal
+          open={balanceDetailOpen}
+          loading={balanceDetailLoading}
+          error={balanceDetailError}
+          detail={balanceDetail}
+          onClose={closeBalanceDetail}
+          formatLeaveDays={formatLeaveDays}
+        />
       </div>
-    </Layout>
   )
 }

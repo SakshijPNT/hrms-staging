@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Hrms.NewApi.Dtos;
 using Hrms.NewApi.Interfaces;
+using Hrms.NewApi.Support;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Hrms.NewApi.Controllers;
@@ -79,6 +80,18 @@ public class CompanyController : ControllerBase
             cancellationToken);
 
         return Ok(companies);
+    }
+
+    [HttpGet("timezones")]
+    public IActionResult GetTimezones()
+    {
+        var session = GetSessionInfo();
+        if (session is null)
+        {
+            return Unauthorized(new { message = "No active session." });
+        }
+
+        return Ok(CuratedTimezones.GetAll());
     }
 
     private SessionInfoDto? GetSessionInfo()

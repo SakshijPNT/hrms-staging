@@ -64,6 +64,7 @@ using (var scope = app.Services.CreateScope())
     {
         app.Logger.LogInformation("Applying database migrations...");
         dbContext.Database.Migrate();
+        SyncUserLeaveBalancesIdSequence(dbContext);
         app.Logger.LogInformation("Database migrations applied successfully.");
     }
     catch (Exception ex)
@@ -85,3 +86,29 @@ app.UseCors("AllowFrontend");
 app.UseSession();
 app.MapControllers();
 app.Run();
+
+static void SyncUserLeaveBalancesIdSequence(HrmsDbContext dbContext)
+{
+    dbContext.Database.ExecuteSqlRaw(
+        """
+        DO $$
+        DECLARE
+            sequence_name text;
+            max_id bigint;
+        BEGIN
+            SELECT pg_get_serial_sequence('userleavebalances', 'id') INTO sequence_name;
+
+            IF sequence_name IS NULL THEN
+                RETURN;
+            END IF;
+
+            SELECT COALESCE(MAX(id), 0) INTO max_id FROM userleavebalances;
+
+            IF max_id = 0 THEN
+                PERFORM setval(sequence_name, 1, false);
+            ELSE
+                PERFORM setval(sequence_name, max_id, true);
+            END IF;
+        END $$;
+        """);
+}

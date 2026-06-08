@@ -28,4 +28,11 @@ public interface IHolidayManager
         int id,
         int companyId,
         CancellationToken cancellationToken = default);
+
+    Task SyncHolidaysAsync(
+        int companyId,
+        int year,
+        IReadOnlyList<HolidaySyncItemDto> holidays,
+        int userId,
+        CancellationToken cancellationToken = default);
 }

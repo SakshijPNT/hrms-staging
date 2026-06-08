@@ -22,5 +22,9 @@ public class CompanyUpdateDto
 
     public string? Timezone { get; set; }
 
+    public short? FiscalYearStartMonth { get; set; }
+
+    public short? FiscalYearStartDay { get; set; }
+
     public int StatusCode { get; set; }
 }

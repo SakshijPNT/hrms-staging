@@ -14,4 +14,10 @@ public interface ICalendarManager
         int userId,
         DateOnly date,
         CancellationToken cancellationToken = default);
+
+    Task<MonthlyAttendanceLogResponseDto> GetMonthlyAttendanceLogAsync(
+        int userId,
+        int year,
+        int month,
+        CancellationToken cancellationToken = default);
 }

@@ -14,6 +14,8 @@ public class CompanyMaster
     public string? Country { get; set; }
     public string? Pincode { get; set; }
     public string Timezone { get; set; } = "Asia/Kolkata";
+    public short FiscalYearStartMonth { get; set; } = 4;
+    public short FiscalYearStartDay { get; set; } = 1;
     public short StatusCode { get; set; } = 1;
     public int CreatedBy { get; set; }
     public DateTimeOffset CreatedOn { get; set; }
@@ -158,6 +160,12 @@ public class UserLeaveBalance
     public decimal CreditedDays { get; set; }
     public decimal TakenDays { get; set; }
     public decimal AvailableBalance { get; set; }
+    public decimal MonthlyAllocation { get; set; }
+    public decimal MonthlyUsed { get; set; }
+    public decimal MonthlyPending { get; set; }
+    public decimal MonthlyCarryForward { get; set; }
+    public decimal FiscalYearCarryForwardIn { get; set; }
+    public string? LastProcessedMonth { get; set; }
     public short StatusCode { get; set; } = 1;
     public int CreatedBy { get; set; }
     public DateTimeOffset CreatedOn { get; set; }
@@ -176,6 +184,7 @@ public class UserAttendanceLog
     public string AttendanceStatus { get; set; } = null!;
     public bool IsLate { get; set; }
     public bool IsEarlyLeave { get; set; }
+    public bool IsRegularized { get; set; }
     public string? Remarks { get; set; }
     public short StatusCode { get; set; } = 1;
     public int CreatedBy { get; set; }
@@ -209,6 +218,7 @@ public class CompanyPolicies
     public string WorkDays { get; set; } = "MON,TUE,WED,THU,FRI";
     public TimeOnly ShiftStart { get; set; } = TimeOnly.Parse("09:00:00");
     public TimeOnly ShiftEnd { get; set; } = TimeOnly.Parse("17:00:00");
+    public int RegularizationWindowDays { get; set; } = 30;
     public short StatusCode { get; set; } = 1;
     public int CreatedBy { get; set; }
     public DateTimeOffset CreatedOn { get; set; }
@@ -225,8 +235,10 @@ public class AttendanceRegularization
     public int? AttendanceLogId { get; set; }
     public DateTimeOffset? OriginalCheckInTime { get; set; }
     public DateTimeOffset? OriginalCheckOutTime { get; set; }
-    public DateTimeOffset RequestedCheckInTime { get; set; }
-    public DateTimeOffset RequestedCheckOutTime { get; set; }
+    public DateTimeOffset? RequestedCheckInTime { get; set; }
+    public DateTimeOffset? RequestedCheckOutTime { get; set; }
+    public string OriginalAttendanceStatus { get; set; } = null!;
+    public string RequestedCorrectionType { get; set; } = null!;
     public string Reason { get; set; } = null!;
     public string ApprovalStatus { get; set; } = "PENDING";
     public int? ApprovedBy { get; set; }

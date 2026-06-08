@@ -2,6 +2,7 @@ using Hrms.NewApi.Data;
 using Hrms.NewApi.Dtos;
 using Hrms.NewApi.Interfaces;
 using Hrms.NewApi.Models;
+using Hrms.NewApi.Support;
 using Microsoft.EntityFrameworkCore;
 using TimeZoneConverter;
 
@@ -28,22 +29,19 @@ public class RegularizationManager : IRegularizationManager
             logDate,
             cancellationToken);
 
-        var attendance = await _dbContext.UserAttendanceLogs
-            .AsNoTracking()
-            .FirstOrDefaultAsync(
-                x => x.UserId == userId
-                    && x.LogDate == logDate
-                    && x.StatusCode == 1,
-                cancellationToken);
+        var attendance = await GetAttendanceLogAsync(userId, logDate, cancellationToken);
 
         return new RegularizationPreviewDto
         {
             LogDate = logDate,
             AttendanceLogId = attendance?.Id,
+            OriginalAttendanceStatus = context.OriginalStatus,
             OriginalCheckInTime = attendance?.CheckInTime,
             OriginalCheckOutTime = attendance?.CheckOutTime,
+            WorkedMinutes = attendance?.WorkedMinutes,
             CanSubmit = context.CanSubmit,
             BlockReason = context.BlockReason,
+            AllowedCorrectionTypes = context.AllowedCorrectionTypes,
         };
     }
 
@@ -58,11 +56,14 @@ public class RegularizationManager : IRegularizationManager
             throw new InvalidOperationException("Reason is required.");
         }
 
-        if (request.RequestedCheckOutTime <= request.RequestedCheckInTime)
-        {
-            throw new InvalidOperationException(
-                "Requested check-out time must be later than check-in time.");
-        }
+        var company = await _dbContext.CompanyMasters
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                x => x.Id == companyId,
+                cancellationToken)
+            ?? throw new InvalidOperationException("Company not found.");
+
+        var correctionType = NormalizeCorrectionType(request.RequestedCorrectionType);
 
         var validation = await BuildValidationContextAsync(
             userId,
@@ -76,28 +77,39 @@ public class RegularizationManager : IRegularizationManager
                 validation.BlockReason ?? "Regularization is not allowed for this date.");
         }
 
-        var attendance = await _dbContext.UserAttendanceLogs
-            .AsNoTracking()
-            .FirstOrDefaultAsync(
-                x => x.UserId == userId
-                    && x.LogDate == request.LogDate
-                    && x.StatusCode == 1,
-                cancellationToken);
-
-        var requestedCheckInUtc = ToUtcOffset(
-            request.LogDate,
-            request.RequestedCheckInTime,
-            validation.TimezoneInfo);
-
-        var requestedCheckOutUtc = ToUtcOffset(
-            request.LogDate,
-            request.RequestedCheckOutTime,
-            validation.TimezoneInfo);
-
-        if (requestedCheckOutUtc <= requestedCheckInUtc)
+        if (!validation.AllowedCorrectionTypes.Contains(correctionType))
         {
             throw new InvalidOperationException(
-                "Requested check-out time must be later than check-in time.");
+                $"Correction type {correctionType} is not allowed for this attendance status.");
+        }
+
+        var attendance = await GetAttendanceLogAsync(
+            userId,
+            request.LogDate,
+            cancellationToken);
+
+        var timezoneInfo = GetTimezoneInfo(company.Timezone);
+        DateTimeOffset? requestedCheckIn = null;
+        DateTimeOffset? requestedCheckOut = null;
+
+        if (AttendanceStatusHelper.IsTimeBasedCorrection(correctionType))
+        {
+            requestedCheckIn = ParseRequestedLogTime(
+                request.LogDate,
+                request.RequestedCheckInTime,
+                timezoneInfo,
+                "Regularized check-in time");
+            requestedCheckOut = ParseRequestedLogTime(
+                request.LogDate,
+                request.RequestedCheckOutTime,
+                timezoneInfo,
+                "Regularized check-out time");
+
+            if (requestedCheckOut <= requestedCheckIn)
+            {
+                throw new InvalidOperationException(
+                    "Regularized check-out must be later than check-in.");
+            }
         }
 
         var now = DateTimeOffset.UtcNow;
@@ -108,8 +120,10 @@ public class RegularizationManager : IRegularizationManager
             AttendanceLogId = attendance?.Id,
             OriginalCheckInTime = attendance?.CheckInTime,
             OriginalCheckOutTime = attendance?.CheckOutTime,
-            RequestedCheckInTime = requestedCheckInUtc,
-            RequestedCheckOutTime = requestedCheckOutUtc,
+            OriginalAttendanceStatus = validation.OriginalStatus!,
+            RequestedCorrectionType = correctionType,
+            RequestedCheckInTime = requestedCheckIn,
+            RequestedCheckOutTime = requestedCheckOut,
             Reason = request.Reason.Trim(),
             ApprovalStatus = "PENDING",
             StatusCode = 1,
@@ -140,6 +154,8 @@ public class RegularizationManager : IRegularizationManager
             {
                 Id = item.Id,
                 LogDate = item.LogDate,
+                OriginalAttendanceStatus = item.OriginalAttendanceStatus,
+                RequestedCorrectionType = item.RequestedCorrectionType,
                 OriginalCheckInTime = item.OriginalCheckInTime,
                 OriginalCheckOutTime = item.OriginalCheckOutTime,
                 RequestedCheckInTime = item.RequestedCheckInTime,
@@ -210,6 +226,8 @@ public class RegularizationManager : IRegularizationManager
                 EmployeeName = employee.FullName,
                 EmployeeEmail = employee.EmailId,
                 LogDate = item.LogDate,
+                OriginalAttendanceStatus = item.OriginalAttendanceStatus,
+                RequestedCorrectionType = item.RequestedCorrectionType,
                 OriginalCheckInTime = item.OriginalCheckInTime,
                 OriginalCheckOutTime = item.OriginalCheckOutTime,
                 RequestedCheckInTime = item.RequestedCheckInTime,
@@ -242,20 +260,19 @@ public class RegularizationManager : IRegularizationManager
             .AsNoTracking()
             .FirstAsync(x => x.Id == entity.UserId, cancellationToken);
 
-        var policy = await GetCompanyPolicyAsync(employee.CompanyId, cancellationToken);
         var company = await _dbContext.CompanyMasters
             .AsNoTracking()
             .FirstAsync(x => x.Id == employee.CompanyId, cancellationToken);
 
-        var timezoneInfo = GetTimezoneInfo(company.Timezone);
+        var policy = await GetCompanyPolicyAsync(employee.CompanyId, cancellationToken);
         var now = DateTimeOffset.UtcNow;
 
-        await ApplyApprovedTimesToAttendanceLogAsync(
+        await ApplyRegularizationApprovalAsync(
             entity,
             employee.Id,
             approverId,
             policy,
-            timezoneInfo,
+            GetTimezoneInfo(company.Timezone),
             now,
             cancellationToken);
 
@@ -284,12 +301,18 @@ public class RegularizationManager : IRegularizationManager
             companyId,
             cancellationToken);
 
+        if (string.IsNullOrWhiteSpace(request.ApproverRemark))
+        {
+            throw new InvalidOperationException(
+                "Rejection reason is required.");
+        }
+
         var now = DateTimeOffset.UtcNow;
 
         entity.ApprovalStatus = "REJECTED";
         entity.ApprovedBy = approverId;
         entity.ApprovedOn = now;
-        entity.ApproverRemark = request.ApproverRemark?.Trim();
+        entity.ApproverRemark = request.ApproverRemark.Trim();
         entity.UpdatedBy = approverId;
         entity.UpdatedOn = now;
 
@@ -298,7 +321,7 @@ public class RegularizationManager : IRegularizationManager
         return await MapListItemAsync(entity.Id, cancellationToken);
     }
 
-    private async Task ApplyApprovedTimesToAttendanceLogAsync(
+    private async Task ApplyRegularizationApprovalAsync(
         AttendanceRegularization entity,
         int employeeId,
         int approverId,
@@ -312,8 +335,7 @@ public class RegularizationManager : IRegularizationManager
         {
             attendance = await _dbContext.UserAttendanceLogs
                 .FirstOrDefaultAsync(
-                    x => x.Id == entity.AttendanceLogId.Value
-                        && x.StatusCode == 1,
+                    x => x.Id == entity.AttendanceLogId.Value && x.StatusCode == 1,
                     cancellationToken)
                 ?? throw new InvalidOperationException(
                     "Linked attendance log was not found.");
@@ -345,26 +367,46 @@ public class RegularizationManager : IRegularizationManager
             }
         }
 
-        attendance.CheckInTime = entity.RequestedCheckInTime;
-        attendance.CheckOutTime = entity.RequestedCheckOutTime;
-        attendance.WorkedMinutes = (int)(
-            entity.RequestedCheckOutTime - entity.RequestedCheckInTime).TotalMinutes;
+        if (AttendanceStatusHelper.IsTimeBasedCorrection(entity.RequestedCorrectionType))
+        {
+            if (!entity.RequestedCheckInTime.HasValue
+                || !entity.RequestedCheckOutTime.HasValue)
+            {
+                throw new InvalidOperationException(
+                    "Requested check-in and check-out times are required.");
+            }
 
-        attendance.IsLate = IsCheckInLate(
-            entity.RequestedCheckInTime,
-            policy,
-            timezoneInfo);
+            var workedMinutes = (int)Math.Max(
+                0,
+                (entity.RequestedCheckOutTime.Value - entity.RequestedCheckInTime.Value).TotalMinutes);
 
-        var checkOutLocalTime = ToCompanyLocalTime(
-            entity.RequestedCheckOutTime,
-            timezoneInfo);
+            attendance.CheckInTime = entity.RequestedCheckInTime;
+            attendance.CheckOutTime = entity.RequestedCheckOutTime;
+            attendance.WorkedMinutes = workedMinutes;
+            attendance.AttendanceStatus = AttendanceStatusHelper.ResolveFromWorkedMinutes(
+                workedMinutes,
+                true,
+                false,
+                policy);
+            attendance.IsEarlyLeave =
+                attendance.AttendanceStatus != AttendanceStatusHelper.Present;
+        }
+        else
+        {
+            var newStatus = AttendanceStatusHelper.ResolveStatusAfterRegularization(
+                entity.OriginalAttendanceStatus,
+                entity.RequestedCorrectionType);
 
-        attendance.IsEarlyLeave = IsCheckOutEarly(checkOutLocalTime, policy);
-        attendance.AttendanceStatus = ResolveAttendanceStatus(
-            attendance.WorkedMinutes,
-            attendance.IsEarlyLeave,
-            policy);
+            var workedMinutes = AttendanceStatusHelper.ResolveWorkedMinutesForCorrection(
+                entity.RequestedCorrectionType,
+                policy);
 
+            attendance.AttendanceStatus = newStatus;
+            attendance.WorkedMinutes = workedMinutes;
+            attendance.IsEarlyLeave = newStatus != AttendanceStatusHelper.Present;
+        }
+
+        attendance.IsRegularized = true;
         attendance.Remarks = "Regularized";
         attendance.UpdatedBy = approverId;
         attendance.UpdatedOn = now;
@@ -439,15 +481,24 @@ public class RegularizationManager : IRegularizationManager
         if (logDate >= today)
         {
             return ValidationContext.Blocked(
-                timezoneInfo,
-                "Regularization is allowed only for past dates.");
+                "Regularization is allowed only after the day's attendance status is finalised.");
+        }
+
+        var windowDays = policy.RegularizationWindowDays > 0
+            ? policy.RegularizationWindowDays
+            : 30;
+
+        var earliestEligibleDate = today.AddDays(-windowDays);
+        if (logDate < earliestEligibleDate)
+        {
+            return ValidationContext.Blocked(
+                $"Regularization is allowed only within the last {windowDays} days.");
         }
 
         var workDays = ParseWorkDays(policy.WorkDays);
         if (!workDays.Contains(logDate.DayOfWeek))
         {
             return ValidationContext.Blocked(
-                timezoneInfo,
                 "Regularization cannot be requested for a week-off.");
         }
 
@@ -460,8 +511,13 @@ public class RegularizationManager : IRegularizationManager
         if (isHoliday)
         {
             return ValidationContext.Blocked(
-                timezoneInfo,
                 "Regularization cannot be requested for a company holiday.");
+        }
+
+        if (await HasApprovedLeaveOnDateAsync(userId, logDate, cancellationToken))
+        {
+            return ValidationContext.Blocked(
+                "Regularization cannot be requested when approved leave exists for this day.");
         }
 
         var hasPending = await _dbContext.AttendanceRegularizations.AnyAsync(
@@ -474,7 +530,6 @@ public class RegularizationManager : IRegularizationManager
         if (hasPending)
         {
             return ValidationContext.Blocked(
-                timezoneInfo,
                 "A regularization request is already pending for this date.");
         }
 
@@ -488,11 +543,144 @@ public class RegularizationManager : IRegularizationManager
         if (hasApproved)
         {
             return ValidationContext.Blocked(
-                timezoneInfo,
                 "This date already has an approved regularization.");
         }
 
-        return ValidationContext.Allowed(timezoneInfo);
+        var attendance = await GetAttendanceLogAsync(userId, logDate, cancellationToken);
+        var originalStatus = AttendanceStatusHelper.ResolveEffectiveStatus(
+            attendance,
+            policy);
+
+        if (originalStatus == AttendanceStatusHelper.CheckedIn)
+        {
+            return ValidationContext.Allowed(
+                originalStatus,
+                GetAllowedCorrectionTypes(originalStatus));
+        }
+
+        if (!AttendanceStatusHelper.IsRegularizationEligible(originalStatus))
+        {
+            return ValidationContext.Blocked(
+                "Regularization is available only for Absent, Half Day, Short Day, or missing checkout.");
+        }
+
+        return ValidationContext.Allowed(
+            originalStatus,
+            GetAllowedCorrectionTypes(originalStatus));
+    }
+
+    private static IReadOnlyList<string> GetAllowedCorrectionTypes(string originalStatus)
+    {
+        return originalStatus switch
+        {
+            AttendanceStatusHelper.Absent =>
+            [
+                AttendanceStatusHelper.CorrectionFullDay,
+                AttendanceStatusHelper.CorrectionHalfDay,
+                AttendanceStatusHelper.CorrectionShortDay,
+                AttendanceStatusHelper.CorrectionForgotCheckIn,
+                AttendanceStatusHelper.CorrectionForgotCheckOut,
+            ],
+            AttendanceStatusHelper.HalfDay =>
+            [
+                AttendanceStatusHelper.CorrectionFullDay,
+                AttendanceStatusHelper.CorrectionShortDay,
+                AttendanceStatusHelper.CorrectionForgotCheckIn,
+                AttendanceStatusHelper.CorrectionForgotCheckOut,
+            ],
+            AttendanceStatusHelper.ShortDay =>
+            [
+                AttendanceStatusHelper.CorrectionFullDay,
+                AttendanceStatusHelper.CorrectionHalfDay,
+                AttendanceStatusHelper.CorrectionShortDay,
+                AttendanceStatusHelper.CorrectionForgotCheckIn,
+                AttendanceStatusHelper.CorrectionForgotCheckOut,
+            ],
+            AttendanceStatusHelper.CheckedIn =>
+            [
+                AttendanceStatusHelper.CorrectionFullDay,
+                AttendanceStatusHelper.CorrectionHalfDay,
+                AttendanceStatusHelper.CorrectionShortDay,
+                AttendanceStatusHelper.CorrectionForgotCheckIn,
+                AttendanceStatusHelper.CorrectionForgotCheckOut,
+            ],
+            _ => Array.Empty<string>(),
+        };
+    }
+
+    private static string NormalizeCorrectionType(string value)
+    {
+        var normalized = value.Trim().ToUpperInvariant();
+        if (normalized is AttendanceStatusHelper.CorrectionFullDay
+            or AttendanceStatusHelper.CorrectionHalfDay
+            or AttendanceStatusHelper.CorrectionShortDay
+            or AttendanceStatusHelper.CorrectionForgotCheckIn
+            or AttendanceStatusHelper.CorrectionForgotCheckOut)
+        {
+            return normalized;
+        }
+
+        throw new InvalidOperationException(
+            "Requested correction type is not supported.");
+    }
+
+    private static DateTimeOffset ParseRequestedLogTime(
+        DateOnly logDate,
+        string? timeValue,
+        TimeZoneInfo timezoneInfo,
+        string fieldLabel)
+    {
+        if (string.IsNullOrWhiteSpace(timeValue))
+        {
+            throw new InvalidOperationException($"{fieldLabel} is required.");
+        }
+
+        if (!TimeSpan.TryParse(timeValue.Trim(), out var time))
+        {
+            throw new InvalidOperationException($"{fieldLabel} is invalid.");
+        }
+
+        var local = new DateTime(
+            logDate.Year,
+            logDate.Month,
+            logDate.Day,
+            0,
+            0,
+            0,
+            DateTimeKind.Unspecified).Add(time);
+
+        var companyOffset = timezoneInfo.GetUtcOffset(local);
+        return new DateTimeOffset(local, companyOffset).ToUniversalTime();
+    }
+
+    private async Task<bool> HasApprovedLeaveOnDateAsync(
+        int userId,
+        DateOnly logDate,
+        CancellationToken cancellationToken)
+    {
+        return await _dbContext.LeaveApplications
+            .AsNoTracking()
+            .AnyAsync(
+                x => x.UserId == userId
+                    && x.StatusCode == 1
+                    && x.ApprovalStatus == "APPROVED"
+                    && x.FromDate <= logDate
+                    && x.ToDate >= logDate,
+                cancellationToken);
+    }
+
+    private async Task<UserAttendanceLog?> GetAttendanceLogAsync(
+        int userId,
+        DateOnly logDate,
+        CancellationToken cancellationToken)
+    {
+        return await _dbContext.UserAttendanceLogs
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                x => x.UserId == userId
+                    && x.LogDate == logDate
+                    && x.StatusCode == 1,
+                cancellationToken);
     }
 
     private async Task<CompanyPolicies> GetCompanyPolicyAsync(
@@ -521,6 +709,8 @@ public class RegularizationManager : IRegularizationManager
             {
                 Id = item.Id,
                 LogDate = item.LogDate,
+                OriginalAttendanceStatus = item.OriginalAttendanceStatus,
+                RequestedCorrectionType = item.RequestedCorrectionType,
                 OriginalCheckInTime = item.OriginalCheckInTime,
                 OriginalCheckOutTime = item.OriginalCheckOutTime,
                 RequestedCheckInTime = item.RequestedCheckInTime,
@@ -536,17 +726,6 @@ public class RegularizationManager : IRegularizationManager
             .FirstAsync(cancellationToken);
     }
 
-    private static DateTimeOffset ToUtcOffset(
-        DateOnly date,
-        TimeOnly time,
-        TimeZoneInfo timezoneInfo)
-    {
-        var localDateTime = date.ToDateTime(time);
-        var unspecified = DateTime.SpecifyKind(localDateTime, DateTimeKind.Unspecified);
-        var utc = TimeZoneInfo.ConvertTimeToUtc(unspecified, timezoneInfo);
-        return new DateTimeOffset(utc, TimeSpan.Zero);
-    }
-
     private static TimeZoneInfo GetTimezoneInfo(string? timezone)
     {
         return TZConvert.GetTimeZoneInfo(
@@ -560,52 +739,6 @@ public class RegularizationManager : IRegularizationManager
         TimeZoneInfo timezoneInfo)
     {
         return TimeZoneInfo.ConvertTime(utcTime, timezoneInfo);
-    }
-
-    private static TimeOnly ToCompanyLocalTime(
-        DateTimeOffset utcTime,
-        TimeZoneInfo timezoneInfo)
-    {
-        return TimeOnly.FromDateTime(ToCompanyLocal(utcTime, timezoneInfo).DateTime);
-    }
-
-    private static bool IsCheckInLate(
-        DateTimeOffset checkInUtc,
-        CompanyPolicies policy,
-        TimeZoneInfo timezoneInfo)
-    {
-        var actualCheckInTime = ToCompanyLocalTime(checkInUtc, timezoneInfo);
-        var allowedCheckIn = policy.ShiftStart.AddMinutes(policy.CheckInGracePeriod);
-        return actualCheckInTime > allowedCheckIn;
-    }
-
-    private static bool IsCheckOutEarly(
-        TimeOnly actualCheckOutTime,
-        CompanyPolicies policy)
-    {
-        var allowedCheckOut = policy.ShiftEnd.AddMinutes(-policy.CheckOutGracePeriod);
-        return actualCheckOutTime < allowedCheckOut;
-    }
-
-    private static string ResolveAttendanceStatus(
-        int workedMinutes,
-        bool isEarlyLeave,
-        CompanyPolicies policy)
-    {
-        var fullDayMinutes = (int)(policy.WorkHours * 60);
-        var halfDayMinutes = (int)(policy.HalfDayThreshold * 60);
-
-        if (!isEarlyLeave && workedMinutes >= fullDayMinutes)
-        {
-            return "PRESENT";
-        }
-
-        if (workedMinutes >= halfDayMinutes)
-        {
-            return "HALF_DAY";
-        }
-
-        return "ABSENT";
     }
 
     private static IReadOnlySet<DayOfWeek> ParseWorkDays(string workDays)
@@ -643,14 +776,23 @@ public class RegularizationManager : IRegularizationManager
 
     private sealed class ValidationContext
     {
-        public TimeZoneInfo TimezoneInfo { get; init; } = null!;
         public bool CanSubmit { get; init; }
         public string? BlockReason { get; init; }
+        public string? OriginalStatus { get; init; }
+        public IReadOnlyList<string> AllowedCorrectionTypes { get; init; } =
+            Array.Empty<string>();
 
-        public static ValidationContext Allowed(TimeZoneInfo timezoneInfo) =>
-            new() { TimezoneInfo = timezoneInfo, CanSubmit = true };
+        public static ValidationContext Allowed(
+            string originalStatus,
+            IReadOnlyList<string> allowedCorrectionTypes) =>
+            new()
+            {
+                CanSubmit = true,
+                OriginalStatus = originalStatus,
+                AllowedCorrectionTypes = allowedCorrectionTypes,
+            };
 
-        public static ValidationContext Blocked(TimeZoneInfo timezoneInfo, string reason) =>
-            new() { TimezoneInfo = timezoneInfo, CanSubmit = false, BlockReason = reason };
+        public static ValidationContext Blocked(string reason) =>
+            new() { CanSubmit = false, BlockReason = reason };
     }
 }

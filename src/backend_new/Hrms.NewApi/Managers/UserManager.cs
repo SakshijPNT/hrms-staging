@@ -11,40 +11,63 @@ public class UserManager : IUserManager
 {
     private readonly HrmsDbContext _dbContext;
     private readonly IPasswordHasher<UserMaster> _passwordHasher;
-    private const string DefaultPassword = "Welcome@123";
-    public UserManager(HrmsDbContext dbContext, IPasswordHasher<UserMaster> passwordHasher)
+    private readonly IUserLeaveManager _userLeaveManager;
+
+    public UserManager(
+        HrmsDbContext dbContext,
+        IPasswordHasher<UserMaster> passwordHasher,
+        IUserLeaveManager userLeaveManager)
     {
         _dbContext = dbContext;
         _passwordHasher = passwordHasher;
+        _userLeaveManager = userLeaveManager;
     }
 
     public async Task<UserResponseDto> CreateUserAsync(UserUpsertDto request, CancellationToken cancellationToken = default)
     {
         await ValidateUserReferencesAsync(request, currentUserId: null, cancellationToken);
 
-        var user = new UserMaster
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+        try
         {
-            FullName = request.FullName,
-            EmailId = request.EmailId,
-            ManagerId = request.ManagerId,
-            CompanyId = request.CompanyId,
-            RoleId = request.RoleId,
-            JoiningDate = request.JoiningDate,
-            ProbationMonths = request.ProbationMonths,
-            ConfirmationDate = request.ConfirmationDate,
-            StatusCode = request.StatusCode,
-            CreatedBy = request.CreatedBy,
-            UpdatedBy = request.UpdatedBy,
-            CreatedOn = DateTimeOffset.UtcNow,
-            UpdatedOn = DateTimeOffset.UtcNow,
-        };
+            var user = new UserMaster
+            {
+                FullName = request.FullName,
+                EmailId = request.EmailId,
+                ManagerId = request.ManagerId,
+                CompanyId = request.CompanyId,
+                RoleId = request.RoleId,
+                JoiningDate = request.JoiningDate,
+                ProbationMonths = request.ProbationMonths,
+                ConfirmationDate = request.ConfirmationDate,
+                StatusCode = request.StatusCode,
+                CreatedBy = request.CreatedBy,
+                UpdatedBy = request.UpdatedBy,
+                CreatedOn = DateTimeOffset.UtcNow,
+                UpdatedOn = DateTimeOffset.UtcNow,
+            };
 
-        user.Password = _passwordHasher.HashPassword(user, "Welcome@123");
+            user.Password = _passwordHasher.HashPassword(user, "Welcome@123");
 
-        _dbContext.UserMasters.Add(user);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+            _dbContext.UserMasters.Add(user);
+            await _dbContext.SaveChangesAsync(cancellationToken);
 
-        return MapUserResponse(user);
+            await _userLeaveManager.InitializeLeaveBalancesForUserAsync(
+                user.Id,
+                user.CompanyId,
+                request.CreatedBy,
+                cancellationToken);
+
+            await transaction.CommitAsync(cancellationToken);
+
+            return MapUserResponse(user);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
     }
 
     public async Task<UserResponseDto> UpdateUserAsync(int id,UserUpsertDto request,CancellationToken cancellationToken = default)

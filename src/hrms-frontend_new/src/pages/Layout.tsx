@@ -11,6 +11,7 @@ import Sidebar from '../components/Sidebar'
 import Header from '../components/Header'
 
 import api from '../services/api'
+import SessionContext from '../context/SessionContext'
 
 import type {
   SessionInfo,
@@ -112,7 +113,7 @@ export default function Layout({
 
 
   return (
-
+    <SessionContext.Provider value={session}>
     <div className="layout">
 
       {/* MOBILE OVERLAY */}
@@ -149,5 +150,6 @@ export default function Layout({
       </main>
 
     </div>
+    </SessionContext.Provider>
   )
 }

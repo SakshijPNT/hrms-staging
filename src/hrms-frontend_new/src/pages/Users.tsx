@@ -3,9 +3,8 @@ import '../styles/Style.css'
 import api from '../services/api'
 import Layout from '../pages/Layout'
 import type { AxiosError } from 'axios'
-import { FiSearch, FiPlus, FiCalendar } from 'react-icons/fi'
+import { FiSearch, FiPlus, FiCalendar, FiEye } from 'react-icons/fi'
 import { MdEdit } from "react-icons/md";
-import Select from 'react-select'
 import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
 
@@ -45,6 +44,14 @@ interface ManagerItem {
   fullName: string
 }
 
+type UserFieldErrors = {
+  fullName?: string
+  emailId?: string
+  roleId?: string
+  managerId?: string
+  joiningDate?: string
+}
+
 export function UsersPage() {
 
   const [users, setUsers] = useState<UserItem[]>([])
@@ -54,6 +61,8 @@ export function UsersPage() {
   const [search, setSearch] = useState('')
 
   const [modalOpen, setModalOpen] = useState(false)
+  const [viewModalOpen, setViewModalOpen] = useState(false)
+  const [viewUser, setViewUser] = useState<UserItem | null>(null)
 
   const [editingUserId, setEditingUserId] =
     useState<number | null>(null)
@@ -64,6 +73,7 @@ export function UsersPage() {
   const [currentPage, setCurrentPage] = useState(1)
 
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<UserFieldErrors>({})
 
   const [form, setForm] = useState({
     fullName: '',
@@ -157,7 +167,7 @@ export function UsersPage() {
 
   useEffect(() => {
 
-    if (modalOpen) {
+    if (modalOpen || viewModalOpen) {
       document.body.style.overflow = 'hidden'
     } else {
       document.body.style.overflow = 'auto'
@@ -167,7 +177,7 @@ export function UsersPage() {
       document.body.style.overflow = 'auto'
     }
 
-  }, [modalOpen])
+  }, [modalOpen, viewModalOpen])
 
   const filteredUsers = useMemo(() => {
 
@@ -199,12 +209,66 @@ export function UsersPage() {
     })
 
     setError('')
+    setFieldErrors({})
 
     setModalOpen(true)
   }
 
   function closeModal() {
     setModalOpen(false)
+    setFieldErrors({})
+  }
+
+  function openViewModal(user: UserItem) {
+    setViewUser(user)
+    setViewModalOpen(true)
+  }
+
+  function closeViewModal() {
+    setViewModalOpen(false)
+    setViewUser(null)
+  }
+
+  function clearFieldError(field: keyof UserFieldErrors) {
+    setFieldErrors((prev) => {
+      if (!prev[field]) {
+        return prev
+      }
+
+      const next = { ...prev }
+      delete next[field]
+      return next
+    })
+  }
+
+  function validateForm(): UserFieldErrors {
+    const errors: UserFieldErrors = {}
+
+    if (!form.fullName.trim()) {
+      errors.fullName = 'This field is required.'
+    }
+
+    if (!form.emailId.trim()) {
+      errors.emailId = 'This field is required.'
+    } else if (
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.emailId.trim())
+    ) {
+      errors.emailId = 'Please enter a valid email address.'
+    }
+
+    if (!form.roleId) {
+      errors.roleId = 'Please select at least one role.'
+    }
+
+    if (!form.managerId) {
+      errors.managerId = 'Please select at least one manager.'
+    }
+
+    if (!form.joiningDate) {
+      errors.joiningDate = 'This field is required.'
+    }
+
+    return errors
   }
 
   function handleEdit(user: UserItem) {
@@ -232,6 +296,8 @@ export function UsersPage() {
         user.confirmationDate || '',
     })
 
+    setError('')
+    setFieldErrors({})
     setModalOpen(true)
   }
 
@@ -292,15 +358,16 @@ export function UsersPage() {
 
     event.preventDefault()
 
-    if (
-      !form.fullName.trim() ||
-      !form.emailId.trim() ||
-      !form.roleId ||
-      !form.joiningDate
-    ) {
-      setError('All required fields are mandatory.')
+    const validationErrors = validateForm()
+
+    if (Object.keys(validationErrors).length > 0) {
+      setFieldErrors(validationErrors)
+      setError('Please fix the highlighted fields before continuing.')
       return
     }
+
+    setFieldErrors({})
+    setError('')
 
     try {
 
@@ -359,7 +426,7 @@ export function UsersPage() {
     }
   }
 
-  const usersPerPage = 5
+  const usersPerPage = 10
 
   const indexOfLastUser =
     currentPage * usersPerPage
@@ -377,15 +444,32 @@ export function UsersPage() {
     filteredUsers.length / usersPerPage
   )
 
-  const roleOptions = roles.map((role) => ({
-    value: role.id,
-    label: role.roleName,
-  }))
+  const managerChoices = useMemo(() => {
+    if (!editingUserId) {
+      return managers
+    }
 
-  const managerOptions = managers.map((manager) => ({
-    value: manager.id,
-    label: manager.fullName,
-  }))
+    return managers.filter((manager) => manager.id !== editingUserId)
+  }, [managers, editingUserId])
+
+  function selectRole(roleId: number) {
+    clearFieldError('roleId')
+    setForm((current) => ({
+      ...current,
+      roleId: String(roleId),
+    }))
+  }
+
+  function selectManager(managerId: number) {
+    clearFieldError('managerId')
+    setForm((current) => ({
+      ...current,
+      managerId:
+        current.managerId === String(managerId)
+          ? ''
+          : String(managerId),
+    }))
+  }
 
   const [isJoiningDateOpen, setIsJoiningDateOpen] = useState(false);
 
@@ -433,7 +517,7 @@ export function UsersPage() {
                 <th>Manager</th>
                 <th>Joining Date</th>
                 <th>Status</th>
-                <th>Edit</th>
+                <th>Actions</th>
               </tr>
             </thead>
 
@@ -442,7 +526,7 @@ export function UsersPage() {
               {filteredUsers.length === 0 ? (
 
                 <tr>
-                  <td colSpan={7} className="act-empty">
+                  <td colSpan={8} className="act-empty">
                     No users found.
                   </td>
                 </tr>
@@ -503,14 +587,27 @@ export function UsersPage() {
                     </td>
 
                     <td>
-                      <button
-                        className="edit-btn"
-                        onClick={() =>
-                          handleEdit(user)
-                        }
-                      >
-                        <MdEdit />
-                      </button>
+                      <div className="role-table-actions">
+                        <button
+                          type="button"
+                          className="role-action-btn"
+                          title="View user"
+                          aria-label={`View user ${user.fullName}`}
+                          onClick={() => openViewModal(user)}
+                        >
+                          <FiEye />
+                        </button>
+
+                        <button
+                          type="button"
+                          className="role-action-btn"
+                          title="Edit user"
+                          aria-label={`Edit user ${user.fullName}`}
+                          onClick={() => handleEdit(user)}
+                        >
+                          <MdEdit />
+                        </button>
+                      </div>
                     </td>
 
                   </tr>
@@ -567,7 +664,6 @@ export function UsersPage() {
 
           <div
             className="act-modal-overlay"
-            onClick={closeModal}
           >
 
             <div
@@ -596,157 +692,126 @@ export function UsersPage() {
 
               <form
                 id="user-form"
-                className="act-modal-form"
+                className="act-modal-form role-modal-form"
                 onSubmit={handleSubmit}
               >
 
                 <div className="act-form-row">
 
-                  <label className="act-form-field">
+                  <label
+                    className={`act-form-field${fieldErrors.fullName ? ' act-form-field--invalid' : ''}`}
+                  >
                     <span>Full Name *</span>
 
                     <input
                       type="text"
                       value={form.fullName}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        clearFieldError('fullName')
                         setForm((c) => ({
                           ...c,
                           fullName: e.target.value,
                         }))
-                      }
+                      }}
                     />
+                    {fieldErrors.fullName && (
+                      <span className="field-error-message">
+                        {fieldErrors.fullName}
+                      </span>
+                    )}
                   </label>
 
-                  <label className="act-form-field">
+                  <label
+                    className={`act-form-field${fieldErrors.emailId ? ' act-form-field--invalid' : ''}`}
+                  >
                     <span>Email *</span>
 
                     <input
                       type="email"
                       value={form.emailId}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        clearFieldError('emailId')
                         setForm((c) => ({
                           ...c,
                           emailId: e.target.value,
                         }))
-                      }
+                      }}
                     />
+                    {fieldErrors.emailId && (
+                      <span className="field-error-message">
+                        {fieldErrors.emailId}
+                      </span>
+                    )}
                   </label>
 
                 </div>
 
-                <div className="act-form-row">
-
-                  <label className="act-form-field">
-                    <span>Role *</span>
-
-                    {/* <select
-                      value={form.roleId}
-                      onChange={(e) =>
-                        setForm((c) => ({
-                          ...c,
-                          roleId: e.target.value,
-                        }))
-                      }
-                    >
-                      <option value="">
-                        Select Role
-                      </option>
-
-                      {roles.map((role) => (
-                        <option
+                <div
+                  className={`role-activities-section${fieldErrors.roleId ? ' role-activities-section--invalid' : ''}`}
+                >
+                  <h3 className="role-activities-title">Role *</h3>
+                  <div className="role-activities-list">
+                    {roles.length === 0 ? (
+                      <p className="role-activities-empty">No roles available.</p>
+                    ) : (
+                      roles.map((role) => (
+                        <label
                           key={role.id}
-                          value={role.id}
+                          className="role-activity-item"
                         >
-                          {role.roleName}
-                        </option>
-                      ))}
-                    </select> */}
+                          <input
+                            type="checkbox"
+                            checked={form.roleId === String(role.id)}
+                            onChange={() => selectRole(role.id)}
+                          />
+                          <span>{role.roleName}</span>
+                        </label>
+                      ))
+                    )}
+                  </div>
+                  {fieldErrors.roleId && (
+                    <span className="field-error-message">
+                      {fieldErrors.roleId}
+                    </span>
+                  )}
+                </div>
 
-                    <Select
-                      menuPortalTarget={document.body}
-                      menuPosition="fixed"
-                      menuPlacement="auto"
-                      menuShouldScrollIntoView={false}
-
-                      classNamePrefix="act-select"
-                      options={roleOptions}
-                      placeholder="Select Role"
-                      value={
-                        roleOptions.find(
-                          (option) =>
-                            String(option.value) === form.roleId
-                        ) || null
-                      }
-                      onChange={(selected) =>
-                        setForm((c) => ({
-                          ...c,
-                          roleId: selected
-                            ? String(selected.value)
-                            : '',
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="act-form-field">
-                    <span>Manager</span>
-
-                    {/* <select
-                      value={form.managerId}
-                      onChange={(e) =>
-                        setForm((c) => ({
-                          ...c,
-                          managerId: e.target.value,
-                        }))
-                      }
-                    >
-                      <option value="">
-                        Select Manager
-                      </option>
-
-                      {managers.map((manager) => (
-                        <option
+                <div
+                  className={`role-activities-section${fieldErrors.managerId ? ' role-activities-section--invalid' : ''}`}
+                >
+                  <h3 className="role-activities-title">Manager *</h3>
+                  <div className="role-activities-list">
+                    {managerChoices.length === 0 ? (
+                      <p className="role-activities-empty">No managers available.</p>
+                    ) : (
+                      managerChoices.map((manager) => (
+                        <label
                           key={manager.id}
-                          value={manager.id}
+                          className="role-activity-item"
                         >
-                          {manager.fullName}
-                        </option>
-                      ))}
-                    </select> */}
-
-                    <Select
-                      menuPortalTarget={document.body}
-                      menuPosition="fixed"
-                      menuPlacement="auto"
-                      menuShouldScrollIntoView={false}
-                      classNamePrefix="act-select"
-                      options={managerOptions}
-                      placeholder="Select Manager"
-                      isClearable
-                      value={
-                        managerOptions.find(
-                          (option) =>
-                            String(option.value) === form.managerId
-                        ) || null
-                      }
-                      onChange={(selected) =>
-                        setForm((c) => ({
-                          ...c,
-                          managerId: selected
-                            ? String(selected.value)
-                            : '',
-                        }))
-                      }
-                    />
-                  </label>
-
-
+                          <input
+                            type="checkbox"
+                            checked={form.managerId === String(manager.id)}
+                            onChange={() => selectManager(manager.id)}
+                          />
+                          <span>{manager.fullName}</span>
+                        </label>
+                      ))
+                    )}
+                  </div>
+                  {fieldErrors.managerId && (
+                    <span className="field-error-message">
+                      {fieldErrors.managerId}
+                    </span>
+                  )}
                 </div>
 
                 <div className="act-form-row">
 
 
-                  <label className="act-form-field">
+                  <label
+                    className={`act-form-field${fieldErrors.joiningDate ? ' act-form-field--invalid' : ''}`}
+                  >
                     <span>Joining Date *</span>
 
                     {/* <input
@@ -760,7 +825,9 @@ export function UsersPage() {
                       }
                     /> */}
 
-                    <div className="act-date-picker-wrapper">
+                    <div
+                      className={`act-date-picker-wrapper${fieldErrors.joiningDate ? ' act-date-picker-wrapper--invalid' : ''}`}
+                    >
                       <DatePicker
                         selected={
                           form.joiningDate
@@ -768,6 +835,7 @@ export function UsersPage() {
                             : null
                         }
                         onChange={(date: Date | null) => {
+                          clearFieldError('joiningDate')
                           setForm((c) => ({
                             ...c,
                             joiningDate: date
@@ -794,6 +862,11 @@ export function UsersPage() {
                         }
                       />
                     </div>
+                    {fieldErrors.joiningDate && (
+                      <span className="field-error-message">
+                        {fieldErrors.joiningDate}
+                      </span>
+                    )}
                   </label>
 
                   <label className="act-form-field">
@@ -890,6 +963,99 @@ export function UsersPage() {
 
               </div>
 
+            </div>
+          </div>
+        )}
+
+        {viewModalOpen && viewUser && (
+          <div className="act-modal-overlay">
+            <div
+              className="act-modal modal-md"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="act-modal-header">
+                <h2>User Details</h2>
+                <button
+                  type="button"
+                  className="act-modal-close"
+                  onClick={closeViewModal}
+                >
+                  &times;
+                </button>
+              </div>
+
+              <div className="act-modal-form role-modal-form role-view-form">
+                <div className="role-view-field">
+                  <span className="role-view-label">User ID</span>
+                  <p className="role-view-value">{viewUser.id}</p>
+                </div>
+
+                <div className="role-view-field">
+                  <span className="role-view-label">Full Name</span>
+                  <p className="role-view-value">{viewUser.fullName}</p>
+                </div>
+
+                <div className="role-view-field">
+                  <span className="role-view-label">Email</span>
+                  <p className="role-view-value">{viewUser.emailId}</p>
+                </div>
+
+                <div className="role-view-field">
+                  <span className="role-view-label">Role</span>
+                  <p className="role-view-value">
+                    {viewUser.roleName || '-'}
+                  </p>
+                </div>
+
+                <div className="role-view-field">
+                  <span className="role-view-label">Manager</span>
+                  <p className="role-view-value">
+                    {viewUser.managerName || '-'}
+                  </p>
+                </div>
+
+                <div className="role-view-field">
+                  <span className="role-view-label">Joining Date</span>
+                  <p className="role-view-value">{viewUser.joiningDate}</p>
+                </div>
+
+                <div className="role-view-field">
+                  <span className="role-view-label">Probation Months</span>
+                  <p className="role-view-value">{viewUser.probationMonths}</p>
+                </div>
+
+                <div className="role-view-field">
+                  <span className="role-view-label">Confirmation Date</span>
+                  <p className="role-view-value">
+                    {viewUser.confirmationDate || '-'}
+                  </p>
+                </div>
+
+                <div className="role-view-field">
+                  <span className="role-view-label">Status</span>
+                  <p className="role-view-value">
+                    <span
+                      className={
+                        viewUser.status
+                          ? 'role-status role-status-active'
+                          : 'role-status role-status-inactive'
+                      }
+                    >
+                      {viewUser.status ? 'Active' : 'Inactive'}
+                    </span>
+                  </p>
+                </div>
+
+                <div className="act-modal-actions">
+                  <button
+                    type="button"
+                    className="act-cancel-btn"
+                    onClick={closeViewModal}
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}

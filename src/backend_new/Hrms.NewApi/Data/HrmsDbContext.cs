@@ -40,6 +40,8 @@ public class HrmsDbContext : DbContext
             entity.Property(x => x.Country).HasMaxLength(100);
             entity.Property(x => x.Pincode).HasMaxLength(20);
             entity.Property(x => x.Timezone).IsRequired().HasMaxLength(60).HasDefaultValue("Asia/Kolkata");
+            entity.Property(x => x.FiscalYearStartMonth).IsRequired().HasDefaultValue((short)4);
+            entity.Property(x => x.FiscalYearStartDay).IsRequired().HasDefaultValue((short)1);
             entity.Property(x => x.StatusCode).IsRequired().HasDefaultValue((short)1);
             entity.Property(x => x.CreatedOn).HasDefaultValueSql("NOW()");
             entity.Property(x => x.UpdatedOn).HasDefaultValueSql("NOW()");
@@ -254,6 +256,12 @@ public class HrmsDbContext : DbContext
             entity.Property(x => x.CreditedDays).HasPrecision(5, 1).HasDefaultValue(0m);
             entity.Property(x => x.TakenDays).HasPrecision(5, 1).HasDefaultValue(0m);
             entity.Property(x => x.AvailableBalance).HasPrecision(5, 1).HasDefaultValue(0m);
+            entity.Property(x => x.MonthlyAllocation).HasPrecision(5, 1).HasDefaultValue(0m);
+            entity.Property(x => x.MonthlyUsed).HasPrecision(5, 1).HasDefaultValue(0m);
+            entity.Property(x => x.MonthlyPending).HasPrecision(5, 1).HasDefaultValue(0m);
+            entity.Property(x => x.MonthlyCarryForward).HasPrecision(5, 1).HasDefaultValue(0m);
+            entity.Property(x => x.FiscalYearCarryForwardIn).HasPrecision(5, 1).HasDefaultValue(0m);
+            entity.Property(x => x.LastProcessedMonth).HasMaxLength(7);
             entity.Property(x => x.StatusCode).IsRequired().HasDefaultValue((short)1);
             entity.Property(x => x.CreatedOn).HasDefaultValueSql("NOW()");
             entity.Property(x => x.UpdatedOn).HasDefaultValueSql("NOW()");
@@ -282,6 +290,7 @@ public class HrmsDbContext : DbContext
             entity.Property(x => x.WorkedMinutes).HasDefaultValue(0);
             entity.Property(x => x.IsLate).HasDefaultValue(false);
             entity.Property(x => x.IsEarlyLeave).HasDefaultValue(false);
+            entity.Property(x => x.IsRegularized).HasDefaultValue(false);
             entity.Property(x => x.Remarks).HasMaxLength(255);
             entity.Property(x => x.StatusCode).IsRequired().HasDefaultValue((short)1);
             entity.Property(x => x.CreatedOn).HasDefaultValueSql("NOW()");
@@ -327,6 +336,7 @@ public class HrmsDbContext : DbContext
             entity.Property(x => x.WorkDays).IsRequired().HasMaxLength(40).HasDefaultValue("MON,TUE,WED,THU,FRI");
             entity.Property(x => x.ShiftStart).HasColumnType("time").HasDefaultValue(TimeOnly.Parse("09:00:00"));
             entity.Property(x => x.ShiftEnd).HasColumnType("time").HasDefaultValue(TimeOnly.Parse("17:00:00"));
+            entity.Property(x => x.RegularizationWindowDays).HasDefaultValue(30);
             entity.Property(x => x.StatusCode).IsRequired().HasDefaultValue((short)1);
             entity.Property(x => x.CreatedOn).HasDefaultValueSql("NOW()");
             entity.Property(x => x.UpdatedOn).HasDefaultValueSql("NOW()");
@@ -363,11 +373,24 @@ public class HrmsDbContext : DbContext
                     "chk_ar_approvalstatus",
                     "approvalstatus IN ('PENDING','APPROVED','REJECTED','CANCELLED')");
                 t.HasCheckConstraint(
+                    "chk_ar_original_status",
+                    "originalattendancestatus IN ('ABSENT','HALF_DAY','SHORT_DAY','CHECKED_IN')");
+                t.HasCheckConstraint(
+                    "chk_ar_correction_type",
+                    "requestedcorrectiontype IN ('FULL_DAY','HALF_DAY','SHORT_DAY','FORGOT_CHECK_IN','FORGOT_CHECK_OUT')");
+                t.HasCheckConstraint(
                     "chk_ar_requested_times",
-                    "requestedcheckouttime > requestedcheckintime");
+                    "requestedcheckintime IS NULL OR requestedcheckouttime IS NULL OR requestedcheckouttime > requestedcheckintime");
             });
 
             entity.Property(x => x.LogDate).HasColumnType("date");
+
+            entity.Property(x => x.OriginalAttendanceStatus)
+                .IsRequired()
+                .HasMaxLength(20);
+            entity.Property(x => x.RequestedCorrectionType)
+                .IsRequired()
+                .HasMaxLength(20);
 
             entity.Property(x => x.OriginalCheckInTime)
                 .HasColumnType("timestamp with time zone");

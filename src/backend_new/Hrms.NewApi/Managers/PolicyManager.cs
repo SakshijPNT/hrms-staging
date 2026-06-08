@@ -11,10 +11,17 @@ public class PolicyManager : IPolicyManager
     private const string ViewAllCompaniesActivityCode = "A0";
 
     private readonly HrmsDbContext _dbContext;
+    private readonly IHolidayManager _holidayManager;
+    private readonly ILeaveTypeManager _leaveTypeManager;
 
-    public PolicyManager(HrmsDbContext dbContext)
+    public PolicyManager(
+        HrmsDbContext dbContext,
+        IHolidayManager holidayManager,
+        ILeaveTypeManager leaveTypeManager)
     {
         _dbContext = dbContext;
+        _holidayManager = holidayManager;
+        _leaveTypeManager = leaveTypeManager;
     }
 
     // EXISTING METHOD
@@ -66,6 +73,8 @@ public class PolicyManager : IPolicyManager
             "You do not have permission to create policy.");
     }
 
+    await EnsureCompanyExistsAsync(request.CompanyId, cancellationToken);
+
     var now = DateTimeOffset.UtcNow;
 
     var policy = new CompanyPolicies
@@ -91,6 +100,10 @@ public class PolicyManager : IPolicyManager
         ShiftEnd =
             TimeOnly.FromTimeSpan(
                 request.ShiftEnd),
+
+        RegularizationWindowDays = request.RegularizationWindowDays > 0
+            ? request.RegularizationWindowDays
+            : 30,
 
         StatusCode = 1,
 
@@ -129,7 +142,9 @@ public class PolicyManager : IPolicyManager
             policy.ShiftStart.ToTimeSpan(),
 
         ShiftEnd =
-            policy.ShiftEnd.ToTimeSpan()
+            policy.ShiftEnd.ToTimeSpan(),
+
+        RegularizationWindowDays = policy.RegularizationWindowDays,
     };
 }
 
@@ -170,7 +185,8 @@ public async Task<IReadOnlyList<PolicyResponseDto>> GetPoliciesAsync(int loggedI
             ShiftStart =
                 x.ShiftStart.ToTimeSpan(),
             ShiftEnd =
-                x.ShiftEnd.ToTimeSpan()
+                x.ShiftEnd.ToTimeSpan(),
+            RegularizationWindowDays = x.RegularizationWindowDays,
         })
         .ToListAsync(cancellationToken);
 }
@@ -200,6 +216,8 @@ public async Task<PolicyResponseDto> UpdatePolicyAsync(PolicyUpdateDto request,i
             "Policy not found.");
     }
 
+    await EnsureCompanyExistsAsync(request.CompanyId, cancellationToken);
+
     policy.CompanyId = request.CompanyId;
 
     policy.WorkHours = request.WorkHours;
@@ -224,6 +242,10 @@ public async Task<PolicyResponseDto> UpdatePolicyAsync(PolicyUpdateDto request,i
         TimeOnly.FromTimeSpan(
             request.ShiftEnd);
 
+    policy.RegularizationWindowDays = request.RegularizationWindowDays > 0
+        ? request.RegularizationWindowDays
+        : 30;
+
     policy.UpdatedBy = updatedBy;
 
     policy.UpdatedOn =
@@ -242,8 +264,128 @@ public async Task<PolicyResponseDto> UpdatePolicyAsync(PolicyUpdateDto request,i
         CheckoutGracePeriod = policy.CheckOutGracePeriod,
         WorkDays = policy.WorkDays,
         ShiftStart = policy.ShiftStart.ToTimeSpan(),
-        ShiftEnd = policy.ShiftEnd.ToTimeSpan()
+        ShiftEnd = policy.ShiftEnd.ToTimeSpan(),
+        RegularizationWindowDays = policy.RegularizationWindowDays,
     };
+}
+
+public async Task<PolicySetupResponseDto> CreatePolicySetupAsync(
+    PolicySetupCreateDto request,
+    int createdBy,
+    CancellationToken cancellationToken = default)
+{
+    await using var transaction =
+        await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+    try
+    {
+        var policy = await CreatePolicyAsync(
+            request.Policy,
+            createdBy,
+            cancellationToken);
+
+        await _holidayManager.SyncHolidaysAsync(
+            request.Policy.CompanyId,
+            request.HolidayYear,
+            request.Holidays,
+            createdBy,
+            cancellationToken);
+
+        await _leaveTypeManager.SyncLeaveTypesAsync(
+            request.Policy.CompanyId,
+            request.LeaveTypes,
+            createdBy,
+            cancellationToken);
+
+        await transaction.CommitAsync(cancellationToken);
+
+        return new PolicySetupResponseDto
+        {
+            Policy = policy,
+            Message = "Policy setup saved successfully.",
+        };
+    }
+    catch
+    {
+        await transaction.RollbackAsync(cancellationToken);
+        throw;
+    }
+}
+
+public async Task<PolicySetupResponseDto> UpdatePolicySetupAsync(
+    PolicySetupUpdateDto request,
+    int updatedBy,
+    CancellationToken cancellationToken = default)
+{
+    await using var transaction =
+        await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+    try
+    {
+        var policy = await UpdatePolicyAsync(
+            request.Policy,
+            updatedBy,
+            cancellationToken);
+
+        await _holidayManager.SyncHolidaysAsync(
+            request.Policy.CompanyId,
+            request.HolidayYear,
+            request.Holidays,
+            updatedBy,
+            cancellationToken);
+
+        await _leaveTypeManager.SyncLeaveTypesAsync(
+            request.Policy.CompanyId,
+            request.LeaveTypes,
+            updatedBy,
+            cancellationToken);
+
+        await transaction.CommitAsync(cancellationToken);
+
+        return new PolicySetupResponseDto
+        {
+            Policy = policy,
+            Message = "Policy setup updated successfully.",
+        };
+    }
+    catch
+    {
+        await transaction.RollbackAsync(cancellationToken);
+        throw;
+    }
+}
+
+public async Task<PolicyCompanyContextDto> GetCompanyContextAsync(
+    int companyId,
+    CancellationToken cancellationToken = default)
+{
+    var company = await _dbContext.CompanyMasters
+        .AsNoTracking()
+        .Where(x => x.Id == companyId)
+        .Select(x => new PolicyCompanyContextDto
+        {
+            CompanyId = x.Id,
+            CompanyName = x.CompanyName,
+            Timezone = x.Timezone,
+        })
+        .FirstOrDefaultAsync(cancellationToken)
+        ?? throw new KeyNotFoundException($"Company with id {companyId} was not found.");
+
+    return company;
+}
+
+private async Task EnsureCompanyExistsAsync(
+    int companyId,
+    CancellationToken cancellationToken)
+{
+    var exists = await _dbContext.CompanyMasters
+        .AnyAsync(x => x.Id == companyId, cancellationToken);
+
+    if (!exists)
+    {
+        throw new InvalidOperationException(
+            $"Company with id {companyId} was not found. Create the company first or use a valid Company Id.");
+    }
 }
 
 }

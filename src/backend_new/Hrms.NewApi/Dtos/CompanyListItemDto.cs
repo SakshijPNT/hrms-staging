@@ -22,5 +22,9 @@ public class CompanyListItemDto
 
     public string Timezone { get; set; } = null!;
 
+    public short FiscalYearStartMonth { get; set; }
+
+    public short FiscalYearStartDay { get; set; }
+
     public short StatusCode { get; set; }
 }

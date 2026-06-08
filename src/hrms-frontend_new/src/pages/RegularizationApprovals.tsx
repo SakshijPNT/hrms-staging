@@ -5,6 +5,7 @@ import type { AxiosError } from 'axios'
 import api from '../services/api'
 import { formatAttendanceTime, normalizeDate } from '../utils/attendanceFormat'
 import type { ManagerRegularizationApplication } from '../../types/regularization'
+import { formatCorrectionTypeLabel } from '../../types/regularization'
 import type { SessionInfo } from '../../types/auth'
 
 export function RegularizationApprovalsPage() {
@@ -114,8 +115,8 @@ export function RegularizationApprovalsPage() {
                 <th>Date</th>
                 <th>Actual IN</th>
                 <th>Actual OUT</th>
-                <th>Requested IN</th>
-                <th>Requested OUT</th>
+                <th>Original Status</th>
+                <th>Requested Correction</th>
                 <th>Reason</th>
                 <th>Actions</th>
               </tr>
@@ -153,18 +154,8 @@ export function RegularizationApprovalsPage() {
                         timezone,
                       )}
                     </td>
-                    <td>
-                      {formatAttendanceTime(
-                        item.requestedCheckInTime,
-                        timezone,
-                      )}
-                    </td>
-                    <td>
-                      {formatAttendanceTime(
-                        item.requestedCheckOutTime,
-                        timezone,
-                      )}
-                    </td>
+                    <td>{item.originalAttendanceStatus.replace('_', ' ')}</td>
+                    <td>{formatCorrectionTypeLabel(item.requestedCorrectionType)}</td>
                     <td>{item.reason}</td>
                     <td>
                       <div className="reg-action-group">
@@ -194,7 +185,7 @@ export function RegularizationApprovalsPage() {
         </div>
 
         {reviewTarget && reviewAction && (
-          <div className="act-modal-overlay" onClick={closeReview}>
+          <div className="act-modal-overlay">
             <div
               className="act-modal reg-modal"
               onClick={(event) => event.stopPropagation()}

@@ -2,16 +2,16 @@ import {
   useEffect,
   useMemo,
   useState,
-  type FormEvent,
 } from 'react'
 import Layout from './Layout'
 import '../styles/Style.css'
 import api from '../services/api'
+import { useSession } from '../context/SessionContext'
 import type { AxiosError } from 'axios'
-// import Calendar from 'react-calendar'
-// import 'react-calendar/dist/Calendar.css'
+import RegularizationModal from '../components/RegularizationModal'
+import type { RegularizationApplication } from '../../types/regularization'
+import { normalizeDate } from '../utils/attendanceFormat'
 import { FiCalendar } from 'react-icons/fi'
-import Select from 'react-select'
 
 interface Attendance {
   checkInTime: string | null
@@ -20,14 +20,32 @@ interface Attendance {
   attendanceStatus: string
 }
 
-interface AttendanceHistoryRecord {
-  id: number
+interface TodayAttendanceResponse {
   logDate: string
+  dayType: string
+  isCheckInAllowed: boolean
+  dayLabel?: string | null
+  attendance: Attendance | null
+}
+
+interface MonthlyLogDay {
+  date: string
+  dayType: string
+  displayStatus: string | null
+  holidayName?: string | null
   checkInTime: string | null
   checkOutTime: string | null
-  workedHours: number
   workedMinutes: number
-  attendanceStatus: string
+  isFuture: boolean
+  isToday: boolean
+}
+
+interface MonthlyAttendanceLogResponse {
+  year: number
+  month: number
+  timezone: string
+  today: string
+  days: MonthlyLogDay[]
 }
 
 interface AttendanceTableRow {
@@ -38,6 +56,8 @@ interface AttendanceTableRow {
   workedMinutes: number
   statusLabel: string
   statusClass: string
+  displayStatus: string | null
+  dayType: string
   isWeekOff: boolean
   isToday: boolean
   isFuture: boolean
@@ -52,91 +72,71 @@ function formatStatusLabel(status: string) {
     .join(' ')
 }
 
-function toDateKey(date: Date) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
+function mapStatusToClass(status: string | null | undefined) {
+  if (!status) {
+    return 'empty'
+  }
 
-  return `${year}-${month}-${day}`
+  const normalized = status.toLowerCase().replace(/_/g, '-')
+
+  if (normalized === 'leave-pending') {
+    return 'leave'
+  }
+
+  if (normalized === 'checked-in') {
+    return 'present'
+  }
+
+  return normalized
+}
+
+function getYearMonthInTimezone(
+  timezone: string,
+  date = new Date()
+) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: 'numeric',
+  }).formatToParts(date)
+
+  return {
+    year: Number(parts.find((part) => part.type === 'year')?.value),
+    month: Number(parts.find((part) => part.type === 'month')?.value),
+  }
+}
+
+function formatTableDateFromKey(
+  dateKey: string,
+  timezone: string
+) {
+  const [year, month, day] = dateKey.split('-').map(Number)
+  const utcDate = new Date(
+    Date.UTC(year, month - 1, day, 12, 0, 0)
+  )
+
+  return utcDate.toLocaleDateString('en-US', {
+    timeZone: timezone,
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
 }
 
 function normalizeLogDate(logDate: string) {
   return logDate.slice(0, 10)
 }
 
-// Dummy data for attendance table UI preview
-const DUMMY_MONTHLY_RECORDS: AttendanceHistoryRecord[] = [
-  {
-    id: 1,
-    logDate: '2026-06-01',
-    checkInTime: '2026-06-01T08:32:00+05:30',
-    checkOutTime: '2026-06-01T13:00:00+05:30',
-    workedHours: 4.47,
-    workedMinutes: 268,
-    attendanceStatus: 'HALF_DAY',
-  },
-  {
-    id: 2,
-    logDate: '2026-06-02',
-    checkInTime: '2026-06-02T09:00:00+05:30',
-    checkOutTime: '2026-06-02T21:15:00+05:30',
-    workedHours: 11.98,
-    workedMinutes: 719,
-    attendanceStatus: 'PRESENT',
-  },
-  {
-    id: 3,
-    logDate: '2026-06-03',
-    checkInTime: '2026-06-03T08:06:00+05:30',
-    checkOutTime: '2026-06-03T21:14:00+05:30',
-    workedHours: 12.82,
-    workedMinutes: 769,
-    attendanceStatus: 'PRESENT',
-  },
-  {
-    id: 4,
-    logDate: '2026-06-08',
-    checkInTime: '2026-06-08T10:04:00+05:30',
-    checkOutTime: '2026-06-08T14:16:00+05:30',
-    workedHours: 4.2,
-    workedMinutes: 252,
-    attendanceStatus: 'HALF_DAY',
-  },
-  {
-    id: 5,
-    logDate: '2026-06-09',
-    checkInTime: '2026-06-09T09:10:00+05:30',
-    checkOutTime: '2026-06-09T18:30:00+05:30',
-    workedHours: 9.33,
-    workedMinutes: 560,
-    attendanceStatus: 'PRESENT',
-  },
-  {
-    id: 6,
-    logDate: '2026-06-10',
-    checkInTime: null,
-    checkOutTime: null,
-    workedHours: 0,
-    workedMinutes: 0,
-    attendanceStatus: 'LEAVE',
-  },
-]
-
-const REGULARIZATION_TYPE_OPTIONS = [
-  { value: 'late-check-in', label: 'Late Check In' },
-  { value: 'early-check-out', label: 'Early Check Out' },
-  { value: 'missed-punch', label: 'Missed Punch' },
-  { value: 'work-from-home', label: 'Work From Home' },
-  { value: 'other', label: 'Other' },
-]
-
-function formatModalDate(dateKey: string) {
-  const [year, month, day] = dateKey.split('-')
-
-  return `${day}/${month}/${year}`
+export default function Dashboard() {
+  return (
+    <Layout title="Dashboard">
+      <DashboardPage />
+    </Layout>
+  )
 }
 
-export default function Dashboard() {
+function DashboardPage() {
 
   const [attendance, setAttendance] = useState<Attendance | null>(null)
 
@@ -146,18 +146,23 @@ export default function Dashboard() {
   const [loading, setLoading] =
     useState(false)
 
-  const [monthCursor, setMonthCursor] =
-    useState(new Date())
+  const [monthView, setMonthView] = useState({
+    year: 0,
+    month: 0,
+  })
+
+  const [monthlyLogDays, setMonthlyLogDays] =
+    useState<MonthlyLogDay[]>([])
+
+  const [monthlyLogLoading, setMonthlyLogLoading] =
+    useState(false)
 
   const [currentPage, setCurrentPage] =
     useState(1)
 
   const rowsPerPage = 10
 
-  const session = JSON.parse(
-    localStorage.getItem('session') || '{}'
-  )
-
+  const session = useSession()
   const timezone = session.timezone || 'Asia/Kolkata'
 
   // const [selectedDate, setSelectedDate] = useState(new Date())
@@ -168,36 +173,78 @@ export default function Dashboard() {
   const [selectedAttendanceRow, setSelectedAttendanceRow] =
     useState<AttendanceTableRow | null>(null)
 
-  const [regularizationForm, setRegularizationForm] =
-    useState({
-      regularizationType: '',
-      reason: '',
-    })
-
-  const [regularizationError, setRegularizationError] =
-    useState('')
-
-  const todayKey = useMemo(
-    () => toDateKey(new Date()),
-    [currentTime]
+  const [pendingRegDates, setPendingRegDates] = useState<Set<string>>(
+    () => new Set(),
   )
+
+  const fetchPendingRegularizations = async () => {
+    try {
+      const response = await api.get<RegularizationApplication[]>(
+        '/regularization/applications',
+      )
+
+      const pending = new Set(
+        (response.data ?? [])
+          .filter((item) => item.approvalStatus === 'PENDING')
+          .map((item) => normalizeDate(item.logDate)),
+      )
+
+      setPendingRegDates(pending)
+    } catch {
+      setPendingRegDates(new Set())
+    }
+  }
 
   const loadAttendance = async () => {
     try {
       const response =
-        await api.get('/attendance/today')
+        await api.get<TodayAttendanceResponse>(
+          '/attendance/today'
+        )
 
-      setAttendance(response.data)
+      setAttendance(response.data.attendance ?? null)
     } catch {
-      console.log(
-        'No attendance found for today'
-      )
       setAttendance(null)
     }
   }
 
+  const loadMonthlyLog = async (
+    year: number,
+    month: number
+  ) => {
+    try {
+      setMonthlyLogLoading(true)
+
+      const response =
+        await api.get<MonthlyAttendanceLogResponse>(
+          `/attendance/monthly-log/${year}/${month}`
+        )
+
+      setMonthlyLogDays(response.data.days)
+    } catch {
+      setMonthlyLogDays([])
+    } finally {
+      setMonthlyLogLoading(false)
+    }
+  }
+
+  const refreshMonthlyIfCurrent = () => {
+    const { year, month } =
+      getYearMonthInTimezone(timezone)
+
+    if (
+      year === monthView.year &&
+      month === monthView.month
+    ) {
+      loadMonthlyLog(year, month)
+    }
+
+    void fetchPendingRegularizations()
+  }
+
   useEffect(() => {
     loadAttendance()
+    void fetchPendingRegularizations()
 
     const timer = setInterval(() => {
       setCurrentTime(new Date())
@@ -207,8 +254,23 @@ export default function Dashboard() {
   }, [])
 
   useEffect(() => {
+    const { year, month } =
+      getYearMonthInTimezone(timezone)
+
+    setMonthView({ year, month })
+  }, [timezone])
+
+  useEffect(() => {
+    if (monthView.year === 0 || monthView.month === 0) {
+      return
+    }
+
+    loadMonthlyLog(monthView.year, monthView.month)
+  }, [monthView.year, monthView.month])
+
+  useEffect(() => {
     setCurrentPage(1)
-  }, [monthCursor])
+  }, [monthView.year, monthView.month])
 
   useEffect(() => {
     if (regularizationModalOpen) {
@@ -222,24 +284,12 @@ export default function Dashboard() {
     }
   }, [regularizationModalOpen])
 
-  const monthlyRecords = useMemo(() => {
-    const year = monthCursor.getFullYear()
-    const month = monthCursor.getMonth() + 1
-
-    return DUMMY_MONTHLY_RECORDS.filter((record) => {
-      const [recordYear, recordMonth] =
-        normalizeLogDate(record.logDate)
-          .split('-')
-          .map(Number)
-
-      return (
-        recordYear === year &&
-        recordMonth === month
-      )
-    })
-  }, [monthCursor])
-
   const handleCheckIn = async () => {
+    if (attendance?.checkInTime) {
+      alert('You have already checked in today.')
+      return
+    }
+
     try {
       setLoading(true)
 
@@ -248,6 +298,7 @@ export default function Dashboard() {
 
       setAttendance(response.data)
 
+      refreshMonthlyIfCurrent()
       alert('Checked in successfully')
     } catch (error: unknown) {
       const axiosError =
@@ -271,6 +322,7 @@ export default function Dashboard() {
 
       setAttendance(response.data)
 
+      refreshMonthlyIfCurrent()
       alert('Checked out successfully')
     } catch (error: unknown) {
       const axiosError =
@@ -330,88 +382,47 @@ export default function Dashboard() {
     return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} Hrs`
   }
 
-  const formatTableDate = (date: Date) => {
-    return date.toLocaleDateString(
-      'en-US',
-      {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-      }
-    )
-  }
-
-  const monthLabel = monthCursor.toLocaleDateString(
-    'en-US',
-    {
-      month: 'long',
-      year: 'numeric',
-    }
-  )
+  const monthLabel =
+    monthView.month === 0
+      ? ''
+      : new Date(
+          monthView.year,
+          monthView.month - 1,
+          1
+        ).toLocaleDateString('en-US', {
+          month: 'long',
+          year: 'numeric',
+        })
 
   const attendanceRows = useMemo(() => {
-    const year = monthCursor.getFullYear()
-    const month = monthCursor.getMonth()
-    const daysInMonth =
-      new Date(year, month + 1, 0).getDate()
+    return monthlyLogDays.map((day) => {
+      const dateKey = normalizeLogDate(day.date)
+      const statusLabel = day.displayStatus
+        ? formatStatusLabel(day.displayStatus)
+        : '-- -- --'
 
-    const recordMap = new Map(
-      monthlyRecords.map((record) => [
-        normalizeLogDate(record.logDate),
-        record,
-      ])
-    )
-
-    const rows: AttendanceTableRow[] = []
-
-    for (let day = 1; day <= daysInMonth; day++) {
-      const date = new Date(year, month, day)
-      const dateKey = toDateKey(date)
-      const record = recordMap.get(dateKey)
-      const isWeekend =
-        date.getDay() === 0 ||
-        date.getDay() === 6
-      const isToday = dateKey === todayKey
-      const isFuture =
-        dateKey > todayKey
-
-      let statusLabel = '-- -- --'
-      let statusClass = 'empty'
-
-      if (isWeekend) {
-        statusLabel = 'Week Off'
-        statusClass = 'week-off'
-      } else if (record?.attendanceStatus) {
-        statusLabel = formatStatusLabel(
-          record.attendanceStatus
-        )
-        statusClass = statusLabel
-          .toLowerCase()
-          .replace(/\s+/g, '-')
-      } else if (!isFuture) {
-        statusLabel = '-- -- --'
-        statusClass = 'empty'
-      }
-
-      rows.push({
+      return {
         key: dateKey,
-        dateLabel: formatTableDate(date),
-        checkInTime: record?.checkInTime ?? null,
-        checkOutTime: record?.checkOutTime ?? null,
-        workedMinutes:
-          record?.workedMinutes ?? 0,
+        dateLabel: formatTableDateFromKey(
+          dateKey,
+          timezone
+        ),
+        checkInTime: day.checkInTime,
+        checkOutTime: day.checkOutTime,
+        workedMinutes: day.workedMinutes,
         statusLabel,
-        statusClass,
-        isWeekOff: isWeekend,
-        isToday,
-        isFuture,
-        hasRecord: Boolean(record),
-      })
-    }
-
-    return rows
-  }, [monthCursor, monthlyRecords, todayKey])
+        statusClass: mapStatusToClass(day.displayStatus),
+        displayStatus: day.displayStatus,
+        dayType: day.dayType,
+        isWeekOff: day.dayType === 'WEEK_OFF',
+        isToday: day.isToday,
+        isFuture: day.isFuture,
+        hasRecord: Boolean(
+          day.checkInTime || day.checkOutTime
+        ),
+      }
+    })
+  }, [monthlyLogDays, timezone])
 
   const totalPages = Math.ceil(
     attendanceRows.length / rowsPerPage
@@ -436,62 +447,37 @@ export default function Dashboard() {
     .replace(/\s+/g, '-')
 
   function moveMonth(step: number) {
-    setMonthCursor((current) =>
-      new Date(
-        current.getFullYear(),
-        current.getMonth() + step,
+    setMonthView(({ year, month }) => {
+      const next = new Date(
+        year,
+        month - 1 + step,
         1
       )
-    )
+
+      return {
+        year: next.getFullYear(),
+        month: next.getMonth() + 1,
+      }
+    })
   }
 
-  function openRegularizationModal(
-    row: AttendanceTableRow
-  ) {
+  function openRegularizationModal(row: AttendanceTableRow) {
     setSelectedAttendanceRow(row)
-    setRegularizationForm({
-      regularizationType: '',
-      reason: '',
-    })
-    setRegularizationError('')
     setRegularizationModalOpen(true)
   }
 
   function closeRegularizationModal() {
     setRegularizationModalOpen(false)
     setSelectedAttendanceRow(null)
-    setRegularizationForm({
-      regularizationType: '',
-      reason: '',
-    })
-    setRegularizationError('')
   }
 
-  function handleRegularizationSubmit(
-    e: FormEvent<HTMLFormElement>
-  ) {
-    e.preventDefault()
-
-    if (!regularizationForm.regularizationType) {
-      setRegularizationError(
-        'Please select a type of regularization.'
-      )
-      return
-    }
-
-    alert('Regularization request submitted successfully')
-    closeRegularizationModal()
+  function handleRegularizationSuccess() {
+    refreshMonthlyIfCurrent()
+    void fetchPendingRegularizations()
   }
-
-  const selectedRegularizationType =
-    REGULARIZATION_TYPE_OPTIONS.find(
-      (option) =>
-        option.value ===
-        regularizationForm.regularizationType
-    ) || null
 
   return (
-    <Layout title="Dashboard">
+    <>
       <div className="attendance-card">
         <div className="attendance-card-body">
           <div className="attendance-left">
@@ -535,14 +521,13 @@ export default function Dashboard() {
 
           <div className="attendance-buttons">
             <button
-              className={`check-btn ${!attendance?.checkInTime
-                ? 'check-btn-primary'
-                : 'check-btn-secondary'
+              type="button"
+              className={`check-btn ${attendance?.checkInTime
+                ? 'check-btn-secondary check-btn-checked-in'
+                : 'check-btn-primary'
                 }`}
               onClick={handleCheckIn}
-              disabled={
-                !!attendance?.checkInTime || loading
-              }
+              disabled={loading}
             >
               {
                 attendance?.checkInTime
@@ -552,8 +537,8 @@ export default function Dashboard() {
             </button>
 
             <button
-              className={`check-btn ${attendance?.checkInTime &&
-                !attendance?.checkOutTime
+              type="button"
+              className={`check-btn ${attendance?.checkInTime
                 ? 'check-btn-primary'
                 : 'check-btn-secondary'
                 }`}
@@ -641,7 +626,16 @@ export default function Dashboard() {
             </thead>
 
             <tbody>
-              {attendanceRows.length === 0 ? (
+              {monthlyLogLoading ? (
+                <tr>
+                  <td
+                    colSpan={6}
+                    className="act-empty"
+                  >
+                    Loading attendance...
+                  </td>
+                </tr>
+              ) : attendanceRows.length === 0 ? (
                 <tr>
                   <td
                     colSpan={6}
@@ -699,17 +693,24 @@ export default function Dashboard() {
                     </td>
 
                     <td>
-                      <button
-                        type="button"
-                        className="attendance-action-btn"
-                        title="Regularization request"
-                        aria-label={`Open regularization request for ${row.dateLabel}`}
-                        onClick={() =>
-                          openRegularizationModal(row)
-                        }
-                      >
-                        <FiCalendar />
-                      </button>
+                      <div className="attendance-action-cell">
+                        {pendingRegDates.has(row.key) && (
+                          <span className="attendance-reg-pending-badge">
+                            Regularisation Pending
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          className="attendance-action-btn"
+                          title="Regularization request"
+                          aria-label={`Open regularization request for ${row.dateLabel}`}
+                          onClick={() =>
+                            openRegularizationModal(row)
+                          }
+                        >
+                          <FiCalendar />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -758,162 +759,13 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {regularizationModalOpen && (
-        <div
-          className="act-modal-overlay"
-          onClick={closeRegularizationModal}
-        >
-          <div
-            className="act-modal modal-sm"
-            onClick={(e) =>
-              e.stopPropagation()
-            }
-          >
-            <div className="act-modal-header">
-              <h2>Regularization Request</h2>
-
-              <button
-                type="button"
-                className="act-modal-close"
-                onClick={closeRegularizationModal}
-              >
-                &times;
-              </button>
-            </div>
-
-            <form
-              id="regularization-form"
-              className="act-modal-form"
-              onSubmit={handleRegularizationSubmit}
-            >
-              {/* <h3 className="act-form-section-title">
-                Basic Details
-              </h3> */}
-
-              <div className="act-form-row">
-                <label className="act-form-field">
-                  <span>Regularization Date</span>
-
-                  <div className="act-date-picker-wrapper">
-                    <input
-                      type="text"
-                      className="act-date-picker regularization-date-readonly"
-                      value={
-                        selectedAttendanceRow
-                          ? formatModalDate(
-                            selectedAttendanceRow.key
-                          )
-                          : ''
-                      }
-                      readOnly
-                    />
-
-                    <FiCalendar className="act-date-icon" />
-                  </div>
-                </label>
-              </div>
-
-              <div className="act-form-row">
-                <label className="act-form-field">
-                  <span>
-                    Type of Regularization *
-                  </span>
-
-                  <Select
-                    menuPortalTarget={document.body}
-                    menuPosition="fixed"
-                    menuPlacement="auto"
-                    menuShouldScrollIntoView={false}
-                    classNamePrefix="act-select"
-                    options={
-                      REGULARIZATION_TYPE_OPTIONS
-                    }
-                    placeholder="-Select-"
-                    value={selectedRegularizationType}
-                    onChange={(selected) =>
-                      setRegularizationForm((current) => ({
-                        ...current,
-                        regularizationType: selected
-                          ? String(selected.value)
-                          : '',
-                      }))
-                    }
-                  />
-                </label>
-              </div>
-
-              <div className="act-form-row">
-                <label className="act-form-field">
-                  <span>
-                    Reason for Regularization
-                  </span>
-
-                  <textarea
-                    rows={4}
-                    placeholder="-Enter Text-"
-                    value={regularizationForm.reason}
-                    onChange={(e) =>
-                      setRegularizationForm((current) => ({
-                        ...current,
-                        reason: e.target.value,
-                      }))
-                    }
-                  />
-                </label>
-              </div>
-
-              {regularizationError && (
-                <div className="form-error">
-                  {regularizationError}
-                </div>
-              )}
-            </form>
-
-            <div className="act-modal-actions">
-              <button
-                type="button"
-                className="act-cancel-btn"
-                onClick={closeRegularizationModal}
-              >
-                Cancel
-              </button>
-
-              <button
-                type="submit"
-                form="regularization-form"
-                className="act-submit-btn"
-              >
-                Submit
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Calendar UI hidden for now
-      <div className="dashboard-bottom-grid">
-        <div className="attendance-calendar-card">
-          <div className="calendar-card-header">
-            <h3>Attendance Overview</h3>
-          </div>
-
-          <Calendar
-            onChange={(value) =>
-              setSelectedDate(value as Date)
-            }
-            value={selectedDate}
-            className="hrms-calendar"
-          />
-
-          <div className="attendance-legend">
-            <div><span className="legend-dot green"></span>Present</div>
-            <div><span className="legend-dot red"></span>Absent</div>
-            <div><span className="legend-dot orange"></span>Half Day</div>
-            <div><span className="legend-dot blue"></span>Leave</div>
-          </div>
-        </div>
-      </div>
-      */}
-    </Layout>
+      <RegularizationModal
+        open={regularizationModalOpen}
+        timezone={timezone}
+        initialLogDate={selectedAttendanceRow?.key}
+        onClose={closeRegularizationModal}
+        onSuccess={handleRegularizationSuccess}
+      />
+    </>
   )
 }

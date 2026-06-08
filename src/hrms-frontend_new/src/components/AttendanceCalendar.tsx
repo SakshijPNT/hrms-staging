@@ -16,6 +16,8 @@ export interface CalendarDay {
   holidayName: string | null
   leaveBadges: LeaveBadge[]
   isFuture: boolean
+  isRegularized?: boolean
+  hasRegularizationPending?: boolean
 }
 
 interface AttendanceCalendarProps {
@@ -24,7 +26,7 @@ interface AttendanceCalendarProps {
   days: CalendarDay[]
   loading?: boolean
   onMonthChange: (year: number, month: number) => void
-  onDayClick: (date: string) => void
+  onDayClick?: (date: string) => void
 }
 
 const MONTH_NAMES = [
@@ -133,12 +135,22 @@ export default function AttendanceCalendar({
               key={cell.date}
               type="button"
               className={`calendar-day ${dayData?.isFuture ? 'calendar-day-future' : ''}`}
-              onClick={() => onDayClick(cell.date)}
+              onClick={() => onDayClick?.(cell.date!)}
             >
               <span className="calendar-day-number">{dayNum}</span>
               <span
                 className={`calendar-day-circle calendar-color-${colorClass}`}
               />
+              {dayData?.isRegularized && (
+                <span className="calendar-reg-badge calendar-reg-badge--approved">
+                  R
+                </span>
+              )}
+              {dayData?.hasRegularizationPending && (
+                <span className="calendar-reg-badge calendar-reg-badge--pending">
+                  Regularisation Pending
+                </span>
+              )}
               {dayData?.leaveBadges?.map((badge, badgeIndex) => (
                 <span
                   key={`${cell.date}-badge-${badgeIndex}`}
@@ -160,6 +172,9 @@ export default function AttendanceCalendar({
           <i className="calendar-legend-dot calendar-color-half_day" /> Half Day
         </span>
         <span className="calendar-legend-item">
+          <i className="calendar-legend-dot calendar-color-short_day" /> Short Day
+        </span>
+        <span className="calendar-legend-item">
           <i className="calendar-legend-dot calendar-color-absent" /> Absent
         </span>
         <span className="calendar-legend-item">
@@ -170,6 +185,14 @@ export default function AttendanceCalendar({
         </span>
         <span className="calendar-legend-item">
           <i className="calendar-legend-dot calendar-color-leave" /> Leave
+        </span>
+        <span className="calendar-legend-item">
+          <span className="calendar-reg-badge calendar-reg-badge--approved">R</span>
+          {' '}Regularised
+        </span>
+        <span className="calendar-legend-item">
+          <span className="calendar-reg-badge calendar-reg-badge--pending">Pending</span>
+          {' '}Regularisation Pending
         </span>
       </div>
     </div>
