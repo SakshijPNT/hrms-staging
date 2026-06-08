@@ -1,4 +1,6 @@
-import { NavLink, useNavigate  } from 'react-router-dom'
+import { NavLink } from 'react-router-dom'
+
+import api from '../services/api'
 
 import {
   MdDashboardCustomize,
@@ -12,6 +14,7 @@ import {
   HiOutlineBuildingOffice2,
   HiOutlineCalendarDays,
   HiOutlineClipboardDocumentCheck,
+  HiOutlineInbox,
 } from 'react-icons/hi2'
 
 import {
@@ -107,6 +110,14 @@ const moduleRoutes: Record<
     ),
   },
 
+  'Other Requests': {
+    path: '/other-requests',
+    label: 'Other Requests',
+    icon: (
+      <HiOutlineInbox className="menu-icon" />
+    ),
+  },
+
   Settings: {
     path: '/settings',
     label: 'Settings',
@@ -139,60 +150,29 @@ const SIDEBAR_MODULE_ORDER: Record<string, number> = {
   'My Leaves': 3,
   'My Approval': 4,
   'My Team': 6,
+  'Other Requests': 7,
   Settings: 100,
 }
 
-const FRONTEND_ONLY_MODULES: ModuleGroup[] = [
-  {
-    groupId: 999901,
-    groupName: 'My Leaves',
-    modules: [
-      {
-        id: 999901,
-        moduleName: 'My Leaves',
-        description: 'My Leaves',
-        iconUrl: undefined,
-      },
-    ],
-  },
-  {
-    groupId: 999902,
-    groupName: 'My Approval',
-    modules: [
-      {
-        id: 999902,
-        moduleName: 'My Approval',
-        description: 'My Approval',
-        iconUrl: undefined,
-      },
-    ],
-  },
-]
+const HIDDEN_SIDEBAR_MODULES = new Set([
+  'My Applications',
+])
 
-function enhanceSidebarGroups(
+function getSidebarGroups(
   groups: ModuleGroup[]
 ): ModuleGroup[] {
-  const existingModuleNames = new Set(
-    groups.flatMap((group) =>
-      group.modules.map(
-        (module) => module.moduleName
-      )
-    )
-  )
+  const filtered = groups
+    .map((group) => ({
+      ...group,
+      modules: group.modules.filter(
+        (module) =>
+          !HIDDEN_SIDEBAR_MODULES.has(module.moduleName) &&
+          module.moduleName in moduleRoutes,
+      ),
+    }))
+    .filter((group) => group.modules.length > 0)
 
-  const modulesToAdd =
-    FRONTEND_ONLY_MODULES.filter(
-      (group) =>
-        !existingModuleNames.has(
-          group.modules[0].moduleName
-        )
-    )
-
-  if (modulesToAdd.length === 0) {
-    return groups
-  }
-
-  return [...groups, ...modulesToAdd]
+  return sortSidebarGroups(filtered)
 }
 
 function sortSidebarGroups(
@@ -226,23 +206,6 @@ function sortSidebarGroups(
   })
 }
 
-function getSidebarGroups(
-  groups: ModuleGroup[]
-): ModuleGroup[] {
-  const filtered = groups
-    .map((group) => ({
-      ...group,
-      modules: group.modules.filter(
-        (module) => module.moduleName !== 'My Applications',
-      ),
-    }))
-    .filter((group) => group.modules.length > 0)
-
-  return sortSidebarGroups(
-    enhanceSidebarGroups(filtered),
-  )
-}
-
 export default function Sidebar({
 
   groups,
@@ -251,16 +214,17 @@ export default function Sidebar({
   sidebarOpen,
 }: SidebarProps) {
 
-    const navigate = useNavigate()
+    async function handleLogout() {
+      try {
+        await api.post('/auth/logout')
+      } catch {
+        // Continue logout even if the API call fails.
+      }
 
-    function handleLogout() {
-
-  // future token cleanup can go here
-
-  localStorage.clear()
-
-  navigate('/login')
-}
+      localStorage.clear()
+      sessionStorage.clear()
+      window.location.replace('/login')
+    }
 
   return (
 

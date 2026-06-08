@@ -185,6 +185,7 @@ public class UserAttendanceLog
     public bool IsLate { get; set; }
     public bool IsEarlyLeave { get; set; }
     public bool IsRegularized { get; set; }
+    public bool IsAdminCorrected { get; set; }
     public string? Remarks { get; set; }
     public short StatusCode { get; set; } = 1;
     public int CreatedBy { get; set; }
@@ -239,14 +240,35 @@ public class AttendanceRegularization
     public DateTimeOffset? RequestedCheckOutTime { get; set; }
     public string OriginalAttendanceStatus { get; set; } = null!;
     public string RequestedCorrectionType { get; set; } = null!;
+    /// <summary>FIRST_HALF or SECOND_HALF when RequestedCorrectionType is HALF_DAY.</summary>
+    public string? Session { get; set; }
     public string Reason { get; set; } = null!;
     public string ApprovalStatus { get; set; } = "PENDING";
     public int? ApprovedBy { get; set; }
     public DateTimeOffset? ApprovedOn { get; set; }
     public string? ApproverRemark { get; set; }
+    /// <summary>MANAGER or ADMIN — set when request is approved/rejected.</summary>
+    public string? ReviewChannel { get; set; }
     public short StatusCode { get; set; } = 1;
     public int CreatedBy { get; set; }
     public DateTimeOffset CreatedOn { get; set; }
     public int UpdatedBy { get; set; }
     public DateTimeOffset UpdatedOn { get; set; }
+}
+
+public class AdminAttendanceCorrection
+{
+    public int Id { get; set; }
+    public int UserId { get; set; }
+    public DateOnly LogDate { get; set; }
+    public int? AttendanceLogId { get; set; }
+    public string RequestedCorrectionType { get; set; } = null!;
+    public string? Session { get; set; }
+    public DateTimeOffset? RequestedCheckInTime { get; set; }
+    public DateTimeOffset? RequestedCheckOutTime { get; set; }
+    public string Reason { get; set; } = null!;
+    public int AdminUserId { get; set; }
+    public short StatusCode { get; set; } = 1;
+    public int CreatedBy { get; set; }
+    public DateTimeOffset CreatedOn { get; set; }
 }

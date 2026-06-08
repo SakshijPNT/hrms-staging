@@ -101,6 +101,28 @@ function mapApplication(item: ManagerLeaveApplication): ApprovalRequest {
   }
 }
 
+function formatRegCorrectionLabel(item: ManagerRegularizationApplication) {
+  const base = formatCorrectionTypeLabel(item.requestedCorrectionType)
+
+  if (
+    item.requestedCorrectionType === 'HALF_DAY' &&
+    item.session
+  ) {
+    const sessionLabel =
+      item.session === 'FIRST_HALF'
+        ? '1st Half'
+        : item.session === 'SECOND_HALF'
+          ? '2nd Half'
+          : null
+
+    if (sessionLabel) {
+      return `${base} (${sessionLabel})`
+    }
+  }
+
+  return base
+}
+
 function formatLeaveDays(value: number) {
   const rounded = Math.round(value * 100) / 100
   if (Number.isInteger(rounded)) {
@@ -135,6 +157,7 @@ function MyApprovalContent() {
 
   const [typeFilter, setTypeFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [regStatusFilter, setRegStatusFilter] = useState('all')
   const [search, setSearch] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [viewModalOpen, setViewModalOpen] = useState(false)
@@ -237,7 +260,7 @@ function MyApprovalContent() {
 
     try {
       const response = await api.get<ManagerRegularizationApplication[]>(
-        '/regularization/pending-approvals',
+        '/regularization/manager-requests',
       )
 
       setRegularizationItems(
@@ -257,6 +280,14 @@ function MyApprovalContent() {
             (item as { RequestedCorrectionType?: string })
               .RequestedCorrectionType ??
             '',
+          approvalStatus:
+            item.approvalStatus ??
+            (item as { ApprovalStatus?: string }).ApprovalStatus ??
+            'PENDING',
+          session:
+            item.session ??
+            (item as { Session?: string }).Session ??
+            null,
           reason:
             item.reason ??
             (item as { Reason?: string }).Reason ??
@@ -285,7 +316,7 @@ function MyApprovalContent() {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [typeFilter, statusFilter, search, approvalTab])
+  }, [typeFilter, statusFilter, regStatusFilter, search, approvalTab])
 
   useEffect(() => {
     if (isModalOpen) {
@@ -540,10 +571,27 @@ function MyApprovalContent() {
     }
   }
 
+  const pendingRegularizationCount = useMemo(
+    () =>
+      regularizationItems.filter(
+        (item) => item.approvalStatus?.toUpperCase() === 'PENDING',
+      ).length,
+    [regularizationItems],
+  )
+
   const filteredRegularizations = useMemo(() => {
     const query = search.toLowerCase().trim()
 
     return regularizationItems.filter((item) => {
+      const matchesStatus =
+        regStatusFilter === 'all' ||
+        mapApprovalStatus(item.approvalStatus).toLowerCase() ===
+          regStatusFilter
+
+      if (!matchesStatus) {
+        return false
+      }
+
       if (!query) {
         return true
       }
@@ -554,7 +602,7 @@ function MyApprovalContent() {
         normalizeDate(item.logDate).includes(query)
       )
     })
-  }, [regularizationItems, search])
+  }, [regularizationItems, search, regStatusFilter])
 
   const regTotalPages = Math.max(
     1,
@@ -570,14 +618,7 @@ function MyApprovalContent() {
 
   return (
     <div className="act-page">
-      <div className="act-page-header">
-        <div>
-          <h1 className="act-title">My Approval</h1>
-          <p className="act-subtitle">
-            Review leave and regularization requests from your team.
-          </p>
-        </div>
-      </div>
+     
 
       <div className="act-stats leaves-stats">
           {balancesLoading ? (
@@ -641,13 +682,14 @@ function MyApprovalContent() {
             className={`approval-tab${approvalTab === 'regularization' ? ' approval-tab--active' : ''}`}
             onClick={() => {
               setApprovalTab('regularization')
+              setRegStatusFilter('all')
               setCurrentPage(1)
             }}
           >
             Regularization
-            {regularizationItems.length > 0 && (
+            {pendingRegularizationCount > 0 && (
               <span className="approval-tab-badge">
-                {regularizationItems.length}
+                {pendingRegularizationCount}
               </span>
             )}
           </button>
@@ -655,7 +697,7 @@ function MyApprovalContent() {
 
         <div className="act-toolbar leaves-toolbar approval-toolbar">
           <div className="leaves-filters approval-filters">
-            {approvalTab === 'leave' && (
+            {approvalTab === 'leave' ? (
               <>
             <div className="leaves-filter-field">
               <Select
@@ -695,6 +737,25 @@ function MyApprovalContent() {
               />
             </div>
               </>
+            ) : (
+              <div className="leaves-filter-field">
+                <Select
+                  menuPortalTarget={document.body}
+                  menuPosition="fixed"
+                  menuPlacement="auto"
+                  menuShouldScrollIntoView={false}
+                  classNamePrefix="act-select"
+                  options={STATUS_FILTER_OPTIONS}
+                  value={
+                    STATUS_FILTER_OPTIONS.find(
+                      (option) => option.value === regStatusFilter,
+                    ) || STATUS_FILTER_OPTIONS[0]
+                  }
+                  onChange={(selected) =>
+                    setRegStatusFilter(selected ? String(selected.value) : 'all')
+                  }
+                />
+              </div>
             )}
 
             <div className="approval-search-wrapper">
@@ -837,30 +898,31 @@ function MyApprovalContent() {
               <tr>
                 <th>Employee</th>
                 <th>Date</th>
-                <th>Actual IN</th>
-                <th>Actual OUT</th>
-                <th>Requested IN</th>
-                <th>Requested OUT</th>
                 <th>Correction</th>
                 <th>Reason</th>
+                <th>Status</th>
                 <th>Action</th>
               </tr>
             </thead>
             <tbody>
               {regularizationLoading ? (
                 <tr>
-                  <td colSpan={9} className="act-empty">
+                  <td colSpan={6} className="act-empty">
                     Loading regularization requests...
                   </td>
                 </tr>
               ) : filteredRegularizations.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="act-empty">
-                    No pending regularization requests.
+                  <td colSpan={6} className="act-empty">
+                    No regularization requests found.
                   </td>
                 </tr>
               ) : (
-                currentRegRows.map((item) => (
+                currentRegRows.map((item) => {
+                  const canReview =
+                    item.approvalStatus?.toUpperCase() === 'PENDING'
+
+                  return (
                   <tr key={item.id}>
                     <td>
                       <div>{item.employeeName}</div>
@@ -868,28 +930,23 @@ function MyApprovalContent() {
                     </td>
                     <td>{formatDisplayDate(normalizeDate(item.logDate))}</td>
                     <td>
-                      {formatAttendanceTime(item.originalCheckInTime, timezone)}
-                    </td>
-                    <td>
-                      {formatAttendanceTime(item.originalCheckOutTime, timezone)}
-                    </td>
-                    <td>
-                      {formatAttendanceTime(item.requestedCheckInTime, timezone)}
-                    </td>
-                    <td>
-                      {formatAttendanceTime(item.requestedCheckOutTime, timezone)}
-                    </td>
-                    <td>
-                      {formatCorrectionTypeLabel(item.requestedCorrectionType)}
+                      {formatRegCorrectionLabel(item)}
                     </td>
                     <td>{item.reason}</td>
+                    <td>
+                      <span
+                        className={`leave-status-text ${getStatusClass(mapApprovalStatus(item.approvalStatus))}`}
+                      >
+                        {mapApprovalStatus(item.approvalStatus)}
+                      </span>
+                    </td>
                     <td>
                       <div className="table-action-group approval-action-group">
                         <button
                           type="button"
                           className="approval-action-btn reject"
                           title="Reject request"
-                          disabled={actionId === item.id}
+                          disabled={!canReview || actionId === item.id}
                           onClick={() => openRegReview(item, 'reject')}
                         >
                           <FiX />
@@ -898,7 +955,7 @@ function MyApprovalContent() {
                           type="button"
                           className="approval-action-btn approve"
                           title="Approve request"
-                          disabled={actionId === item.id}
+                          disabled={!canReview || actionId === item.id}
                           onClick={() => openRegReview(item, 'approve')}
                         >
                           <FiCheck />
@@ -906,7 +963,8 @@ function MyApprovalContent() {
                       </div>
                     </td>
                   </tr>
-                ))
+                  )
+                })
               )}
             </tbody>
           </table>

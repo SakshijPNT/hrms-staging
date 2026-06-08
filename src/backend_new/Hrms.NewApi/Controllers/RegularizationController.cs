@@ -133,7 +133,9 @@ public class RegularizationController : ControllerBase
     }
 
     [HttpGet("pending-approvals")]
-    public async Task<IActionResult> GetPendingApprovals(CancellationToken cancellationToken)
+    [HttpGet("manager-requests")]
+    public async Task<IActionResult> GetManagerRegularizationRequests(
+        CancellationToken cancellationToken)
     {
         var session = GetSessionInfo();
         if (session is null)
@@ -141,7 +143,7 @@ public class RegularizationController : ControllerBase
             return Unauthorized(new { message = "No active session." });
         }
 
-        var items = await _regularizationManager.GetPendingForManagerAsync(
+        var items = await _regularizationManager.GetManagerRegularizationRequestsAsync(
             session.UserId,
             session.CompanyId,
             cancellationToken);
@@ -216,6 +218,163 @@ public class RegularizationController : ControllerBase
         catch (UnauthorizedAccessException ex)
         {
             return Forbid(ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpGet("admin/pending-queue")]
+    public async Task<IActionResult> GetAdminPendingQueue(
+        CancellationToken cancellationToken)
+    {
+        var session = GetSessionInfo();
+        if (session is null)
+        {
+            return Unauthorized(new { message = "No active session." });
+        }
+
+        var items = await _regularizationManager.GetAdminPendingQueueAsync(
+            session.UserId,
+            session.CompanyId,
+            cancellationToken);
+
+        return Ok(items);
+    }
+
+    [HttpPatch("admin/applications/{id:int}/approve")]
+    public async Task<IActionResult> AdminApproveApplication(
+        int id,
+        [FromBody] ReviewRegularizationDto request,
+        CancellationToken cancellationToken)
+    {
+        var session = GetSessionInfo();
+        if (session is null)
+        {
+            return Unauthorized(new { message = "No active session." });
+        }
+
+        try
+        {
+            var result = await _regularizationManager.AdminApproveAsync(
+                id,
+                session.UserId,
+                session.CompanyId,
+                request,
+                cancellationToken);
+
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Forbid(ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPatch("admin/applications/{id:int}/reject")]
+    public async Task<IActionResult> AdminRejectApplication(
+        int id,
+        [FromBody] ReviewRegularizationDto request,
+        CancellationToken cancellationToken)
+    {
+        var session = GetSessionInfo();
+        if (session is null)
+        {
+            return Unauthorized(new { message = "No active session." });
+        }
+
+        try
+        {
+            var result = await _regularizationManager.AdminRejectAsync(
+                id,
+                session.UserId,
+                session.CompanyId,
+                request,
+                cancellationToken);
+
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Forbid(ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpGet("admin/manual-correction/preview")]
+    public async Task<IActionResult> GetAdminManualCorrectionPreview(
+        [FromQuery] int userId,
+        [FromQuery] string date,
+        CancellationToken cancellationToken)
+    {
+        var session = GetSessionInfo();
+        if (session is null)
+        {
+            return Unauthorized(new { message = "No active session." });
+        }
+
+        if (!TryParseDate(date, out var logDate))
+        {
+            return BadRequest(new { message = "Invalid date format. Use yyyy-MM-dd." });
+        }
+
+        try
+        {
+            var preview = await _regularizationManager.GetAdminManualCorrectionPreviewAsync(
+                userId,
+                session.CompanyId,
+                logDate,
+                cancellationToken);
+
+            return Ok(preview);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("admin/manual-correction")]
+    public async Task<IActionResult> ApplyAdminManualCorrection(
+        [FromBody] CreateAdminManualCorrectionDto request,
+        CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var session = GetSessionInfo();
+        if (session is null)
+        {
+            return Unauthorized(new { message = "No active session." });
+        }
+
+        try
+        {
+            var result = await _regularizationManager.ApplyAdminManualCorrectionAsync(
+                session.UserId,
+                session.CompanyId,
+                request,
+                cancellationToken);
+
+            return Ok(result);
         }
         catch (InvalidOperationException ex)
         {

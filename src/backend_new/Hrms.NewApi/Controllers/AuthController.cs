@@ -94,13 +94,14 @@ public class AuthController : ControllerBase
     }
 
     // LOGOUT
-    /*[HttpPost("logout")]
+    [HttpPost("logout")]
     public IActionResult Logout()
     {
         HttpContext.Session.Clear();
+        Response.Cookies.Delete(".AspNetCore.Session");
 
-        return NoContent();
-    }*/
+        return Ok(new { message = "Logged out successfully." });
+    }
 }
 
 

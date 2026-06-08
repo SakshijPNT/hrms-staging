@@ -120,6 +120,12 @@ public class CalendarManager : ICalendarManager
             endDate,
             cancellationToken);
 
+        var regularizations = await LoadRegularizationsAsync(
+            userId,
+            startDate,
+            endDate,
+            cancellationToken);
+
         var days = new List<AttendanceLogDayDto>();
         for (var date = startDate; date <= endDate; date = date.AddDays(1))
         {
@@ -128,7 +134,8 @@ public class CalendarManager : ICalendarManager
                 context,
                 attendanceByDate,
                 holidays,
-                leaveApplications));
+                leaveApplications,
+                regularizations));
         }
 
         return new MonthlyAttendanceLogResponseDto
@@ -279,7 +286,8 @@ public class CalendarManager : ICalendarManager
         UserCalendarContext context,
         IReadOnlyDictionary<DateOnly, UserAttendanceLog> attendanceByDate,
         IReadOnlyDictionary<DateOnly, HolidayList> holidays,
-        IReadOnlyList<LeaveApplicationRow> leaveApplications)
+        IReadOnlyList<LeaveApplicationRow> leaveApplications,
+        IReadOnlyDictionary<DateOnly, RegularizationRow> regularizationsByDate)
     {
         var isFuture = date > context.Today;
         var isToday = date == context.Today;
@@ -294,6 +302,8 @@ public class CalendarManager : ICalendarManager
             leaveBadges,
             context.Today);
 
+        regularizationsByDate.TryGetValue(date, out var regularization);
+
         return new AttendanceLogDayDto
         {
             Date = date,
@@ -306,7 +316,49 @@ public class CalendarManager : ICalendarManager
             IsFuture = isFuture,
             IsToday = isToday,
             LeaveBadges = leaveBadges,
+            HasRegularizationPending = regularization?.ApprovalStatus == "PENDING",
+            IsRegularized = attendance?.IsRegularized ?? false,
+            RegularizationStatus = BuildRegularizationStatusLabel(regularization),
         };
+    }
+
+    private static string? BuildRegularizationStatusLabel(RegularizationRow? regularization)
+    {
+        if (regularization == null)
+        {
+            return null;
+        }
+
+        var prefix = regularization.ApprovalStatus switch
+        {
+            "PENDING" => "Reg. Pending",
+            "APPROVED" => "Reg. Approved",
+            "REJECTED" => "Reg. Rejected",
+            _ => null,
+        };
+
+        if (prefix == null)
+        {
+            return null;
+        }
+
+        if (regularization.RequestedCorrectionType == "HALF_DAY"
+            && !string.IsNullOrWhiteSpace(regularization.Session))
+        {
+            var halfLabel = regularization.Session switch
+            {
+                "FIRST_HALF" => "1H",
+                "SECOND_HALF" => "2H",
+                _ => null,
+            };
+
+            if (halfLabel != null)
+            {
+                return $"{prefix} · {halfLabel} Regularize";
+            }
+        }
+
+        return prefix;
     }
 
     private static string? ResolveTableDisplayStatus(
@@ -493,11 +545,15 @@ public class CalendarManager : ICalendarManager
                 && x.LogDate >= fromDate
                 && x.LogDate <= toDate
                 && x.StatusCode == 1
-                && (x.ApprovalStatus == "PENDING" || x.ApprovalStatus == "APPROVED"))
+                && (x.ApprovalStatus == "PENDING"
+                    || x.ApprovalStatus == "APPROVED"
+                    || x.ApprovalStatus == "REJECTED"))
             .Select(x => new RegularizationRow
             {
                 LogDate = x.LogDate,
                 ApprovalStatus = x.ApprovalStatus,
+                RequestedCorrectionType = x.RequestedCorrectionType,
+                Session = x.Session,
             })
             .ToListAsync(cancellationToken);
 
@@ -611,6 +667,8 @@ public class CalendarManager : ICalendarManager
     {
         public DateOnly LogDate { get; init; }
         public string ApprovalStatus { get; init; } = null!;
+        public string RequestedCorrectionType { get; init; } = null!;
+        public string? Session { get; init; }
     }
 
     private sealed class LeaveApplicationRow

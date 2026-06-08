@@ -133,6 +133,97 @@ public class UserManager : IUserManager
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<TeamMemberListItemDto>> GetMyTeamAsync(
+        int managerId,
+        int companyId,
+        CancellationToken cancellationToken = default)
+    {
+        return await (
+            from employee in _dbContext.UserMasters.AsNoTracking()
+            join role in _dbContext.RoleMasters.AsNoTracking()
+                on employee.RoleId equals role.Id
+            join manager in _dbContext.UserMasters.AsNoTracking()
+                on employee.ManagerId equals manager.Id into managers
+            from manager in managers.DefaultIfEmpty()
+            where employee.CompanyId == companyId
+                && employee.ManagerId == managerId
+            orderby employee.FullName
+            select new TeamMemberListItemDto
+            {
+                Id = employee.Id,
+                FullName = employee.FullName,
+                EmailId = employee.EmailId,
+                RoleId = employee.RoleId,
+                RoleName = role.RoleName,
+                ManagerId = employee.ManagerId,
+                ManagerName = manager == null ? null : manager.FullName,
+                JoiningDate = employee.JoiningDate,
+                ProbationMonths = employee.ProbationMonths,
+                ConfirmationDate = employee.ConfirmationDate,
+                StatusCode = employee.StatusCode,
+            })
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<TeamMemberListItemDto> GetMyTeamMemberAsync(
+        int managerId,
+        int companyId,
+        int employeeId,
+        CancellationToken cancellationToken = default)
+    {
+        var member = await (
+            from employee in _dbContext.UserMasters.AsNoTracking()
+            join role in _dbContext.RoleMasters.AsNoTracking()
+                on employee.RoleId equals role.Id
+            join manager in _dbContext.UserMasters.AsNoTracking()
+                on employee.ManagerId equals manager.Id into managers
+            from manager in managers.DefaultIfEmpty()
+            where employee.Id == employeeId
+                && employee.CompanyId == companyId
+                && employee.ManagerId == managerId
+            select new TeamMemberListItemDto
+            {
+                Id = employee.Id,
+                FullName = employee.FullName,
+                EmailId = employee.EmailId,
+                RoleId = employee.RoleId,
+                RoleName = role.RoleName,
+                ManagerId = employee.ManagerId,
+                ManagerName = manager == null ? null : manager.FullName,
+                JoiningDate = employee.JoiningDate,
+                ProbationMonths = employee.ProbationMonths,
+                ConfirmationDate = employee.ConfirmationDate,
+                StatusCode = employee.StatusCode,
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return member
+            ?? throw new UnauthorizedAccessException(
+                "You are not the reporting manager for this employee.");
+    }
+
+    public async Task EnsureIsDirectReportAsync(
+        int managerId,
+        int companyId,
+        int employeeId,
+        CancellationToken cancellationToken = default)
+    {
+        var isDirectReport = await _dbContext.UserMasters
+            .AsNoTracking()
+            .AnyAsync(
+                employee =>
+                    employee.Id == employeeId
+                    && employee.CompanyId == companyId
+                    && employee.ManagerId == managerId,
+                cancellationToken);
+
+        if (!isDirectReport)
+        {
+            throw new UnauthorizedAccessException(
+                "You are not the reporting manager for this employee.");
+        }
+    }
+
     public async Task<IReadOnlyList<ManagerListItemDto>> GetManagerListAsync(int companyId,CancellationToken cancellationToken = default)
     {
         return await _dbContext.UserMasters

@@ -74,6 +74,8 @@ export function UsersPage() {
 
   const [error, setError] = useState('')
   const [fieldErrors, setFieldErrors] = useState<UserFieldErrors>({})
+  const [roleSearch, setRoleSearch] = useState('')
+  const [managerSearch, setManagerSearch] = useState('')
 
   const [form, setForm] = useState({
     fullName: '',
@@ -210,6 +212,8 @@ export function UsersPage() {
 
     setError('')
     setFieldErrors({})
+    setRoleSearch('')
+    setManagerSearch('')
 
     setModalOpen(true)
   }
@@ -217,6 +221,8 @@ export function UsersPage() {
   function closeModal() {
     setModalOpen(false)
     setFieldErrors({})
+    setRoleSearch('')
+    setManagerSearch('')
   }
 
   function openViewModal(user: UserItem) {
@@ -298,6 +304,8 @@ export function UsersPage() {
 
     setError('')
     setFieldErrors({})
+    setRoleSearch('')
+    setManagerSearch('')
     setModalOpen(true)
   }
 
@@ -451,6 +459,32 @@ export function UsersPage() {
 
     return managers.filter((manager) => manager.id !== editingUserId)
   }, [managers, editingUserId])
+
+  const filteredRoles = useMemo(() => {
+    const q = roleSearch.trim().toLowerCase()
+
+    if (!q) {
+      return roles
+    }
+
+    return roles.filter((role) =>
+      role.roleName.toLowerCase().includes(q) ||
+      String(role.id).includes(q),
+    )
+  }, [roles, roleSearch])
+
+  const filteredManagerChoices = useMemo(() => {
+    const q = managerSearch.trim().toLowerCase()
+
+    if (!q) {
+      return managerChoices
+    }
+
+    return managerChoices.filter((manager) =>
+      manager.fullName.toLowerCase().includes(q) ||
+      String(manager.id).includes(q),
+    )
+  }, [managerChoices, managerSearch])
 
   function selectRole(roleId: number) {
     clearFieldError('roleId')
@@ -750,24 +784,50 @@ export function UsersPage() {
                   className={`role-activities-section${fieldErrors.roleId ? ' role-activities-section--invalid' : ''}`}
                 >
                   <h3 className="role-activities-title">Role *</h3>
-                  <div className="role-activities-list">
-                    {roles.length === 0 ? (
-                      <p className="role-activities-empty">No roles available.</p>
-                    ) : (
-                      roles.map((role) => (
-                        <label
-                          key={role.id}
-                          className="role-activity-item"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={form.roleId === String(role.id)}
-                            onChange={() => selectRole(role.id)}
-                          />
-                          <span>{role.roleName}</span>
-                        </label>
-                      ))
-                    )}
+                  <div className="act-search-wrapper role-activities-search-wrapper">
+                    <FiSearch className="act-search-icon" />
+                    <input
+                      className="act-search"
+                      type="text"
+                      placeholder="Search roles"
+                      value={roleSearch}
+                      onChange={(e) => setRoleSearch(e.target.value)}
+                    />
+                  </div>
+                  <div className="role-activities-table">
+                    <div className="role-activities-list-header role-activities-list-grid">
+                      <span className="role-activities-col-check" aria-hidden="true" />
+                      <span>Role ID</span>
+                      <span>Role Name</span>
+                    </div>
+                    <div className="role-activities-list">
+                      {roles.length === 0 ? (
+                        <p className="role-activities-empty">No roles available.</p>
+                      ) : filteredRoles.length === 0 ? (
+                        <p className="role-activities-empty">
+                          No roles match your search.
+                        </p>
+                      ) : (
+                        filteredRoles.map((role) => (
+                          <label
+                            key={role.id}
+                            className="role-activity-item role-activities-list-grid"
+                          >
+                            <span className="role-activities-col-check">
+                              <input
+                                type="checkbox"
+                                checked={form.roleId === String(role.id)}
+                                onChange={() => selectRole(role.id)}
+                              />
+                            </span>
+                            <span className="role-activities-col-id">{role.id}</span>
+                            <span className="role-activities-col-name">
+                              {role.roleName}
+                            </span>
+                          </label>
+                        ))
+                      )}
+                    </div>
                   </div>
                   {fieldErrors.roleId && (
                     <span className="field-error-message">
@@ -780,24 +840,52 @@ export function UsersPage() {
                   className={`role-activities-section${fieldErrors.managerId ? ' role-activities-section--invalid' : ''}`}
                 >
                   <h3 className="role-activities-title">Manager *</h3>
-                  <div className="role-activities-list">
-                    {managerChoices.length === 0 ? (
-                      <p className="role-activities-empty">No managers available.</p>
-                    ) : (
-                      managerChoices.map((manager) => (
-                        <label
-                          key={manager.id}
-                          className="role-activity-item"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={form.managerId === String(manager.id)}
-                            onChange={() => selectManager(manager.id)}
-                          />
-                          <span>{manager.fullName}</span>
-                        </label>
-                      ))
-                    )}
+                  <div className="act-search-wrapper role-activities-search-wrapper">
+                    <FiSearch className="act-search-icon" />
+                    <input
+                      className="act-search"
+                      type="text"
+                      placeholder="Search managers"
+                      value={managerSearch}
+                      onChange={(e) =>
+                        setManagerSearch(e.target.value)
+                      }
+                    />
+                  </div>
+                  <div className="role-activities-table">
+                    <div className="role-activities-list-header role-activities-list-grid">
+                      <span className="role-activities-col-check" aria-hidden="true" />
+                      <span>ID</span>
+                      <span>Manager Name</span>
+                    </div>
+                    <div className="role-activities-list">
+                      {managerChoices.length === 0 ? (
+                        <p className="role-activities-empty">No managers available.</p>
+                      ) : filteredManagerChoices.length === 0 ? (
+                        <p className="role-activities-empty">
+                          No managers match your search.
+                        </p>
+                      ) : (
+                        filteredManagerChoices.map((manager) => (
+                          <label
+                            key={manager.id}
+                            className="role-activity-item role-activities-list-grid"
+                          >
+                            <span className="role-activities-col-check">
+                              <input
+                                type="checkbox"
+                                checked={form.managerId === String(manager.id)}
+                                onChange={() => selectManager(manager.id)}
+                              />
+                            </span>
+                            <span className="role-activities-col-id">{manager.id}</span>
+                            <span className="role-activities-col-name">
+                              {manager.fullName}
+                            </span>
+                          </label>
+                        ))
+                      )}
+                    </div>
                   </div>
                   {fieldErrors.managerId && (
                     <span className="field-error-message">

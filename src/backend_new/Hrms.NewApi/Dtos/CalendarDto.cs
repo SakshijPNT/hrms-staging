@@ -66,4 +66,7 @@ public class AttendanceLogDayDto
     public bool IsFuture { get; set; }
     public bool IsToday { get; set; }
     public IReadOnlyList<LeaveBadgeDto> LeaveBadges { get; set; } = Array.Empty<LeaveBadgeDto>();
+    public bool HasRegularizationPending { get; set; }
+    public bool IsRegularized { get; set; }
+    public string? RegularizationStatus { get; set; }
 }

@@ -22,6 +22,7 @@ export interface RegularizationApplication {
   logDate: string
   originalAttendanceStatus: string
   requestedCorrectionType: string
+  session?: string | null
   originalCheckInTime: string | null
   originalCheckOutTime: string | null
   requestedCheckInTime: string | null
@@ -32,6 +33,7 @@ export interface RegularizationApplication {
   approverEmailId: string | null
   approvedOn: string | null
   approverRemark: string | null
+  reviewChannel?: string | null
   createdOn: string
 }
 
@@ -42,10 +44,43 @@ export interface ManagerRegularizationApplication
   employeeEmail: string
 }
 
+export interface AdminRegularizationQueueItem
+  extends ManagerRegularizationApplication {
+  managerId: number | null
+  managerName: string | null
+  managerEmail: string | null
+  pendingDays: number
+  isOverdue: boolean
+  isNoApprover: boolean
+  adminCanAct: boolean
+}
+
+export interface AdminManualCorrectionResult {
+  id: number
+  userId: number
+  logDate: string
+  attendanceLogId: number | null
+  requestedCorrectionType: string
+  session?: string | null
+  reason: string
+  createdOn: string
+}
+
+export interface CreateAdminManualCorrectionPayload {
+  userId: number
+  logDate: string
+  requestedCorrectionType: RegularizationCorrectionType
+  reason: string
+  session?: string
+  requestedCheckInTime?: string
+  requestedCheckOutTime?: string
+}
+
 export interface CreateRegularizationPayload {
   logDate: string
   requestedCorrectionType: RegularizationCorrectionType
   reason: string
+  session?: string
   requestedCheckInTime?: string
   requestedCheckOutTime?: string
 }

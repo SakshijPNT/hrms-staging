@@ -13,15 +13,18 @@ public class AttendanceController : ControllerBase
 {
     private readonly IAttendanceManager _attendanceManager;
     private readonly ICalendarManager _calendarManager;
+    private readonly IUserManager _userManager;
 
     private const string SessionKey = "UserSession";
 
     public AttendanceController(
         IAttendanceManager attendanceManager,
-        ICalendarManager calendarManager)
+        ICalendarManager calendarManager,
+        IUserManager userManager)
     {
         _attendanceManager = attendanceManager;
         _calendarManager = calendarManager;
+        _userManager = userManager;
     }
 
     [HttpPost("check-in")]
@@ -121,6 +124,46 @@ public class AttendanceController : ControllerBase
                 cancellationToken);
 
             return Ok(response);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpGet("team/{userId:int}/monthly-log/{year:int}/{month:int}")]
+    public async Task<IActionResult> GetTeamMemberMonthlyAttendanceLog(
+        int userId,
+        int year,
+        int month,
+        CancellationToken cancellationToken)
+    {
+        var session = GetSessionInfo();
+
+        if (session is null)
+        {
+            return Unauthorized(new { message = "No active session." });
+        }
+
+        try
+        {
+            await _userManager.EnsureIsDirectReportAsync(
+                session.UserId,
+                session.CompanyId,
+                userId,
+                cancellationToken);
+
+            var response = await _calendarManager.GetMonthlyAttendanceLogAsync(
+                userId,
+                year,
+                month,
+                cancellationToken);
+
+            return Ok(response);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ex.Message });
         }
         catch (InvalidOperationException ex)
         {

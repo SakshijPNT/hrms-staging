@@ -185,6 +185,7 @@ export function RolesPage() {
 
   const [error, setError] = useState('')
   const [fieldErrors, setFieldErrors] = useState<RoleFieldErrors>({})
+  const [activitySearch, setActivitySearch] = useState('')
 
   // Search
   const filteredRoles = useMemo(() => {
@@ -199,6 +200,18 @@ export function RolesPage() {
 
   }, [roles, search])
 
+  const filteredActivities = useMemo(() => {
+    const q = activitySearch.trim().toLowerCase()
+
+    if (!q) {
+      return activities
+    }
+
+    return activities.filter((activity) =>
+      activity.activityName.toLowerCase().includes(q),
+    )
+  }, [activities, activitySearch])
+
   function openModal() {
     setEditingRoleId(null)
     setEditingStatusCode(1)
@@ -211,12 +224,14 @@ export function RolesPage() {
 
     setError('')
     setFieldErrors({})
+    setActivitySearch('')
     setModalOpen(true)
   }
 
   function closeModal() {
     setModalOpen(false)
     setFieldErrors({})
+    setActivitySearch('')
   }
 
   function clearFieldError(field: keyof RoleFieldErrors) {
@@ -355,6 +370,7 @@ export function RolesPage() {
 
     setError('')
     setFieldErrors({})
+    setActivitySearch('')
     setModalOpen(true)
   }
 
@@ -712,11 +728,27 @@ export function RolesPage() {
                   className={`role-activities-section${fieldErrors.activityIds ? ' role-activities-section--invalid' : ''}`}
                 >
                   <h3 className="role-activities-title">Assign Activities *</h3>
+                  <div className="act-search-wrapper role-activities-search-wrapper">
+                    <FiSearch className="act-search-icon" />
+                    <input
+                      className="act-search"
+                      type="text"
+                      placeholder="Search activities"
+                      value={activitySearch}
+                      onChange={(e) =>
+                        setActivitySearch(e.target.value)
+                      }
+                    />
+                  </div>
                   <div className="role-activities-list">
                     {activities.length === 0 ? (
                       <p className="role-activities-empty">No activities available.</p>
+                    ) : filteredActivities.length === 0 ? (
+                      <p className="role-activities-empty">
+                        No activities match your search.
+                      </p>
                     ) : (
-                      activities.map((activity) => (
+                      filteredActivities.map((activity) => (
                         <label
                           key={activity.id}
                           className="role-activity-item"

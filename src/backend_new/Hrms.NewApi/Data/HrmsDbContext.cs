@@ -23,6 +23,7 @@ public class HrmsDbContext : DbContext
     public DbSet<UserAttendanceLog> UserAttendanceLogs => Set<UserAttendanceLog>();
     public DbSet<HolidayList> HolidayLists => Set<HolidayList>();
     public DbSet<AttendanceRegularization> AttendanceRegularizations => Set<AttendanceRegularization>();
+    public DbSet<AdminAttendanceCorrection> AdminAttendanceCorrections => Set<AdminAttendanceCorrection>();
     public DbSet<CompanyPolicies> 
     
     CompanyPolicies => Set<CompanyPolicies>();
@@ -291,6 +292,7 @@ public class HrmsDbContext : DbContext
             entity.Property(x => x.IsLate).HasDefaultValue(false);
             entity.Property(x => x.IsEarlyLeave).HasDefaultValue(false);
             entity.Property(x => x.IsRegularized).HasDefaultValue(false);
+            entity.Property(x => x.IsAdminCorrected).HasDefaultValue(false);
             entity.Property(x => x.Remarks).HasMaxLength(255);
             entity.Property(x => x.StatusCode).IsRequired().HasDefaultValue((short)1);
             entity.Property(x => x.CreatedOn).HasDefaultValueSql("NOW()");
@@ -381,6 +383,9 @@ public class HrmsDbContext : DbContext
                 t.HasCheckConstraint(
                     "chk_ar_requested_times",
                     "requestedcheckintime IS NULL OR requestedcheckouttime IS NULL OR requestedcheckouttime > requestedcheckintime");
+                t.HasCheckConstraint(
+                    "chk_ar_session",
+                    "session IS NULL OR session IN ('FIRST_HALF','SECOND_HALF')");
             });
 
             entity.Property(x => x.LogDate).HasColumnType("date");
@@ -391,6 +396,7 @@ public class HrmsDbContext : DbContext
             entity.Property(x => x.RequestedCorrectionType)
                 .IsRequired()
                 .HasMaxLength(20);
+            entity.Property(x => x.Session).HasMaxLength(20);
 
             entity.Property(x => x.OriginalCheckInTime)
                 .HasColumnType("timestamp with time zone");
@@ -409,6 +415,7 @@ public class HrmsDbContext : DbContext
                 .HasMaxLength(20)
                 .HasDefaultValue("PENDING");
             entity.Property(x => x.ApproverRemark).HasMaxLength(500);
+            entity.Property(x => x.ReviewChannel).HasMaxLength(20);
 
             entity.Property(x => x.StatusCode)
                 .IsRequired()
@@ -449,6 +456,43 @@ public class HrmsDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(x => x.ApprovedBy)
                 .HasConstraintName("fk_ar_approver")
+                .OnDelete(DeleteBehavior.NoAction);
+        });
+
+        modelBuilder.Entity<AdminAttendanceCorrection>(entity =>
+        {
+            entity.ToTable("admin_attendance_corrections");
+
+            entity.Property(x => x.LogDate).HasColumnType("date");
+            entity.Property(x => x.RequestedCorrectionType).IsRequired().HasMaxLength(20);
+            entity.Property(x => x.Session).HasMaxLength(20);
+            entity.Property(x => x.Reason).IsRequired().HasMaxLength(500);
+            entity.Property(x => x.RequestedCheckInTime)
+                .HasColumnType("timestamp with time zone");
+            entity.Property(x => x.RequestedCheckOutTime)
+                .HasColumnType("timestamp with time zone");
+            entity.Property(x => x.StatusCode).IsRequired().HasDefaultValue((short)1);
+            entity.Property(x => x.CreatedOn).HasDefaultValueSql("NOW()");
+
+            entity.HasIndex(x => x.UserId).HasDatabaseName("idx_aac_userid");
+            entity.HasIndex(x => x.LogDate).HasDatabaseName("idx_aac_logdate");
+
+            entity.HasOne<UserMaster>()
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .HasConstraintName("fk_aac_user")
+                .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasOne<UserMaster>()
+                .WithMany()
+                .HasForeignKey(x => x.AdminUserId)
+                .HasConstraintName("fk_aac_admin")
+                .OnDelete(DeleteBehavior.NoAction);
+
+            entity.HasOne<UserAttendanceLog>()
+                .WithMany()
+                .HasForeignKey(x => x.AttendanceLogId)
+                .HasConstraintName("fk_aac_attendance_log")
                 .OnDelete(DeleteBehavior.NoAction);
         });
     }

@@ -85,6 +85,50 @@ public class UsersController : ControllerBase
         return Ok(users);
     }
 
+    [HttpGet("my-team")]
+    public async Task<IActionResult> GetMyTeam(CancellationToken cancellationToken)
+    {
+        var session = GetSessionInfo();
+        if (session is null)
+        {
+            return Unauthorized(new { message = "No active session." });
+        }
+
+        var team = await _userManager.GetMyTeamAsync(
+            session.UserId,
+            session.CompanyId,
+            cancellationToken);
+
+        return Ok(team);
+    }
+
+    [HttpGet("my-team/{employeeId:int}")]
+    public async Task<IActionResult> GetMyTeamMember(
+        int employeeId,
+        CancellationToken cancellationToken)
+    {
+        var session = GetSessionInfo();
+        if (session is null)
+        {
+            return Unauthorized(new { message = "No active session." });
+        }
+
+        try
+        {
+            var member = await _userManager.GetMyTeamMemberAsync(
+                session.UserId,
+                session.CompanyId,
+                employeeId,
+                cancellationToken);
+
+            return Ok(member);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ex.Message });
+        }
+    }
+
     [HttpPut("{id:int}/status")]
 public async Task<IActionResult> UpdateUserStatus(
     int id,

@@ -27,6 +27,7 @@ const CORRECTION_OPTIONS = [
 const initialForm = {
   logDate: '',
   requestedCorrectionType: '',
+  session: '',
   requestedCheckInTime: '',
   requestedCheckOutTime: '',
   reason: '',
@@ -165,11 +166,14 @@ export default function RegularizationModal({
     form.requestedCorrectionType,
   )
 
+  const showHalfDaySession = form.requestedCorrectionType === 'HALF_DAY'
+
   const canSubmit =
     preview?.canSubmit !== false &&
     !previewLoading &&
     Boolean(form.requestedCorrectionType) &&
     Boolean(form.reason.trim()) &&
+    (!showHalfDaySession || Boolean(form.session)) &&
     (!showRegularizedTimes ||
       (form.requestedCheckInTime && form.requestedCheckOutTime))
 
@@ -198,6 +202,11 @@ export default function RegularizationModal({
       }
     }
 
+    if (showHalfDaySession && !form.session) {
+      setError('Please select 1st half or 2nd half for half-day regularization.')
+      return
+    }
+
     if (preview && !preview.canSubmit) {
       setError(
         preview.blockReason ?? 'Regularization is not allowed for this date.',
@@ -217,6 +226,10 @@ export default function RegularizationModal({
       if (showRegularizedTimes) {
         payload.requestedCheckInTime = form.requestedCheckInTime
         payload.requestedCheckOutTime = form.requestedCheckOutTime
+      }
+
+      if (showHalfDaySession) {
+        payload.session = form.session
       }
 
       await api.post('/regularization/applications', payload)
@@ -354,6 +367,10 @@ export default function RegularizationModal({
                   setForm((current) => ({
                     ...current,
                     requestedCorrectionType: event.target.value,
+                    session:
+                      event.target.value === 'HALF_DAY'
+                        ? current.session
+                        : '',
                     requestedCheckInTime:
                       toTimeInputValue(preview?.originalCheckInTime, timezone),
                     requestedCheckOutTime:
@@ -370,6 +387,44 @@ export default function RegularizationModal({
               </select>
             </label>
           </div>
+
+          {showHalfDaySession && (
+            <div className="act-form-row">
+              <label className="act-form-field">
+                <span>Half Day Session *</span>
+                <div className="halfday-radio-group">
+                  <label className="halfday-radio">
+                    <input
+                      type="radio"
+                      name="regularizationSession"
+                      checked={form.session === 'FIRST_HALF'}
+                      onChange={() =>
+                        setForm((current) => ({
+                          ...current,
+                          session: 'FIRST_HALF',
+                        }))
+                      }
+                    />
+                    <span>1st Half</span>
+                  </label>
+                  <label className="halfday-radio">
+                    <input
+                      type="radio"
+                      name="regularizationSession"
+                      checked={form.session === 'SECOND_HALF'}
+                      onChange={() =>
+                        setForm((current) => ({
+                          ...current,
+                          session: 'SECOND_HALF',
+                        }))
+                      }
+                    />
+                    <span>2nd Half</span>
+                  </label>
+                </div>
+              </label>
+            </div>
+          )}
 
           {showRegularizedTimes && (
             <div className="reg-readonly-block">

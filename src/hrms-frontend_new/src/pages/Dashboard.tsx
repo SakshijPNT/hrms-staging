@@ -9,9 +9,15 @@ import api from '../services/api'
 import { useSession } from '../context/SessionContext'
 import type { AxiosError } from 'axios'
 import RegularizationModal from '../components/RegularizationModal'
-import type { RegularizationApplication } from '../../types/regularization'
-import { normalizeDate } from '../utils/attendanceFormat'
 import { FiCalendar } from 'react-icons/fi'
+
+interface LeaveBadge {
+  leaveTypeCode: string
+  leaveTypeName: string
+  isHalfDay: boolean
+  session: string | null
+  isPending: boolean
+}
 
 interface Attendance {
   checkInTime: string | null
@@ -38,6 +44,10 @@ interface MonthlyLogDay {
   workedMinutes: number
   isFuture: boolean
   isToday: boolean
+  leaveBadges: LeaveBadge[]
+  hasRegularizationPending: boolean
+  isRegularized: boolean
+  regularizationStatus: string | null
 }
 
 interface MonthlyAttendanceLogResponse {
@@ -56,6 +66,8 @@ interface AttendanceTableRow {
   workedMinutes: number
   statusLabel: string
   statusClass: string
+  regularizationStatusLabel: string | null
+  regularizationStatusClass: string | null
   displayStatus: string | null
   dayType: string
   isWeekOff: boolean
@@ -88,6 +100,74 @@ function mapStatusToClass(status: string | null | undefined) {
   }
 
   return normalized
+}
+
+function resolveHalfDayLeaveLabel(
+  session: string | null | undefined,
+  isPending: boolean,
+) {
+  const halfLabel =
+    session === 'FIRST_HALF'
+      ? '1H'
+      : session === 'SECOND_HALF'
+        ? '2H'
+        : 'Half'
+
+  return isPending ? `${halfLabel} · Pending` : `${halfLabel} Leave`
+}
+
+function resolvePrimaryStatus(
+  displayStatus: string | null,
+  leaveBadges: LeaveBadge[],
+) {
+  if (!displayStatus) {
+    return {
+      label: '-- -- --',
+      className: 'empty',
+    }
+  }
+
+  const leaveBadge =
+    displayStatus === 'LEAVE'
+      ? leaveBadges.find((badge) => !badge.isPending)
+      : displayStatus === 'LEAVE_PENDING'
+        ? leaveBadges.find((badge) => badge.isPending)
+        : undefined
+
+  if (leaveBadge?.isHalfDay) {
+    return {
+      label: resolveHalfDayLeaveLabel(
+        leaveBadge.session,
+        leaveBadge.isPending,
+      ),
+      className: 'leave',
+    }
+  }
+
+  return {
+    label: formatStatusLabel(displayStatus),
+    className: mapStatusToClass(displayStatus),
+  }
+}
+
+function resolveRegularizationStatusClass(label: string | null) {
+  if (!label) {
+    return null
+  }
+
+  if (label.startsWith('Reg. Pending')) {
+    return 'reg-pending'
+  }
+
+  if (label.startsWith('Reg. Approved')) {
+    return 'reg-approved'
+  }
+
+  if (label.startsWith('Reg. Rejected')) {
+    return 'reg-rejected'
+  }
+
+  return null
 }
 
 function getYearMonthInTimezone(
@@ -173,28 +253,6 @@ function DashboardPage() {
   const [selectedAttendanceRow, setSelectedAttendanceRow] =
     useState<AttendanceTableRow | null>(null)
 
-  const [pendingRegDates, setPendingRegDates] = useState<Set<string>>(
-    () => new Set(),
-  )
-
-  const fetchPendingRegularizations = async () => {
-    try {
-      const response = await api.get<RegularizationApplication[]>(
-        '/regularization/applications',
-      )
-
-      const pending = new Set(
-        (response.data ?? [])
-          .filter((item) => item.approvalStatus === 'PENDING')
-          .map((item) => normalizeDate(item.logDate)),
-      )
-
-      setPendingRegDates(pending)
-    } catch {
-      setPendingRegDates(new Set())
-    }
-  }
-
   const loadAttendance = async () => {
     try {
       const response =
@@ -238,13 +296,10 @@ function DashboardPage() {
     ) {
       loadMonthlyLog(year, month)
     }
-
-    void fetchPendingRegularizations()
   }
 
   useEffect(() => {
     loadAttendance()
-    void fetchPendingRegularizations()
 
     const timer = setInterval(() => {
       setCurrentTime(new Date())
@@ -397,9 +452,12 @@ function DashboardPage() {
   const attendanceRows = useMemo(() => {
     return monthlyLogDays.map((day) => {
       const dateKey = normalizeLogDate(day.date)
-      const statusLabel = day.displayStatus
-        ? formatStatusLabel(day.displayStatus)
-        : '-- -- --'
+      const primaryStatus = resolvePrimaryStatus(
+        day.displayStatus,
+        day.leaveBadges ?? [],
+      )
+      const regularizationStatusLabel =
+        day.regularizationStatus ?? null
 
       return {
         key: dateKey,
@@ -410,8 +468,12 @@ function DashboardPage() {
         checkInTime: day.checkInTime,
         checkOutTime: day.checkOutTime,
         workedMinutes: day.workedMinutes,
-        statusLabel,
-        statusClass: mapStatusToClass(day.displayStatus),
+        statusLabel: primaryStatus.label,
+        statusClass: primaryStatus.className,
+        regularizationStatusLabel,
+        regularizationStatusClass: resolveRegularizationStatusClass(
+          regularizationStatusLabel,
+        ),
         displayStatus: day.displayStatus,
         dayType: day.dayType,
         isWeekOff: day.dayType === 'WEEK_OFF',
@@ -473,7 +535,6 @@ function DashboardPage() {
 
   function handleRegularizationSuccess() {
     refreshMonthlyIfCurrent()
-    void fetchPendingRegularizations()
   }
 
   return (
@@ -621,6 +682,7 @@ function DashboardPage() {
                 <th>Out Time</th>
                 <th>Status</th>
                 <th>Total Hours</th>
+                <th>Regularization Status</th>
                 <th>Action</th>
               </tr>
             </thead>
@@ -629,7 +691,7 @@ function DashboardPage() {
               {monthlyLogLoading ? (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={7}
                     className="act-empty"
                   >
                     Loading attendance...
@@ -638,7 +700,7 @@ function DashboardPage() {
               ) : attendanceRows.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={7}
                     className="act-empty"
                   >
                     No attendance records found.
@@ -693,12 +755,19 @@ function DashboardPage() {
                     </td>
 
                     <td>
+                      {row.regularizationStatusLabel ? (
+                        <span
+                          className={`attendance-reg-status attendance-reg-status--${row.regularizationStatusClass}`}
+                        >
+                          {row.regularizationStatusLabel}
+                        </span>
+                      ) : (
+                        '--'
+                      )}
+                    </td>
+
+                    <td>
                       <div className="attendance-action-cell">
-                        {pendingRegDates.has(row.key) && (
-                          <span className="attendance-reg-pending-badge">
-                            Regularisation Pending
-                          </span>
-                        )}
                         <button
                           type="button"
                           className="attendance-action-btn"
@@ -719,7 +788,14 @@ function DashboardPage() {
           </table>
 
           {attendanceRows.length > 0 && (
-            <div className="role-pagination">
+            <>
+              <div className="attendance-status-legend">
+                <span>1H Regularize = First half regularization</span>
+                <span>2H Regularize = Second half regularization</span>
+                <span>Reg. = Regularization</span>
+              </div>
+
+              <div className="role-pagination">
               <div className="pagination-info">
                 Showing {currentRows.length} of{' '}
                 {attendanceRows.length}
@@ -754,7 +830,8 @@ function DashboardPage() {
                   &#8250;
                 </button>
               </div>
-            </div>
+              </div>
+            </>
           )}
         </div>
       </div>
