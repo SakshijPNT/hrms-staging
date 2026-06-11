@@ -710,7 +710,7 @@ export function PolicyPage() {
                 <th>Shift</th>
                 <th>Holidays Calendar</th>
                 <th>Leaves</th>
-                <th>Action</th>
+                <th className="table-action-col">Action</th>
               </tr>
 
             </thead>
@@ -774,11 +774,11 @@ export function PolicyPage() {
                       </button>
                     </td>
 
-                    <td>
-                      <div className="policy-table-actions">
+                    <td className="table-action-col">
+                      <div className="table-action-group policy-table-actions">
                         <button
                           type="button"
-                          className="edit-btn"
+                          className="table-action-btn"
                           title="View policy"
                           aria-label={`View policy for company ${policy.companyId}`}
                           onClick={() => handleView(policy)}
@@ -789,7 +789,7 @@ export function PolicyPage() {
                         {hasPolicyAccess && (
                           <button
                             type="button"
-                            className="edit-btn"
+                            className="table-action-btn"
                             title="Edit policy"
                             aria-label={`Edit policy for company ${policy.companyId}`}
                             onClick={() => handleEdit(policy)}
@@ -885,11 +885,11 @@ export function PolicyPage() {
 
               </div>
 
-              <div className="policy-modal-tabs">
+              <div className="act-tabs policy-modal-tabs">
                 <button
                   type="button"
-                  className={`policy-modal-tab${
-                    activeTab === 'work' ? ' active' : ''
+                  className={`act-tab policy-modal-tab${
+                    activeTab === 'work' ? ' act-tab--active active' : ''
                   }`}
                   onClick={() => handleTabClick('work')}
                 >
@@ -898,8 +898,8 @@ export function PolicyPage() {
 
                 <button
                   type="button"
-                  className={`policy-modal-tab${
-                    activeTab === 'holiday' ? ' active' : ''
+                  className={`act-tab policy-modal-tab${
+                    activeTab === 'holiday' ? ' act-tab--active active' : ''
                   }${canAccessTab('holiday') ? '' : ' locked'}`}
                   onClick={() => handleTabClick('holiday')}
                   aria-disabled={!canAccessTab('holiday')}
@@ -909,8 +909,8 @@ export function PolicyPage() {
 
                 <button
                   type="button"
-                  className={`policy-modal-tab${
-                    activeTab === 'leave' ? ' active' : ''
+                  className={`act-tab policy-modal-tab${
+                    activeTab === 'leave' ? ' act-tab--active active' : ''
                   }${canAccessTab('leave') ? '' : ' locked'}`}
                   onClick={() => handleTabClick('leave')}
                   aria-disabled={!canAccessTab('leave')}

@@ -10,6 +10,7 @@ import RegularizationModal from '../components/RegularizationModal'
 import { ApplyLeaveModal } from '../components/ApplyLeaveModal'
 import { formatAttendanceTime, normalizeDate } from '../utils/attendanceFormat'
 import { FiSearch, FiPlus } from 'react-icons/fi'
+import { useAlert } from '../context/AlertContext'
 
 interface LeaveBalance {
   leaveTypeId: number
@@ -32,6 +33,8 @@ interface Application {
 }
 
 export function MyApplicationsPage() {
+
+  const { showAlert, showConfirm } = useAlert()
 
   const [leaveBalances, setLeaveBalances] = useState<LeaveBalance[]>([])
   const [applications, setApplications] = useState<Application[]>([])
@@ -131,7 +134,11 @@ export function MyApplicationsPage() {
   }, [regularizations, search])
 
   async function handleCancelRegularization(id: number) {
-    if (!window.confirm('Cancel this regularization request?')) {
+    const confirmed = await showConfirm(
+      'Cancel this regularization request?',
+    )
+
+    if (!confirmed) {
       return
     }
 
@@ -142,10 +149,12 @@ export function MyApplicationsPage() {
       await fetchRegularizations()
     } catch (cancelError) {
       const axiosError = cancelError as AxiosError<{ message?: string }>
-      window.alert(
-        axiosError.response?.data?.message ??
+      showAlert({
+        title: 'Error',
+        message:
+          axiosError.response?.data?.message ??
           'Failed to cancel regularization request.',
-      )
+      })
     } finally {
       setCancellingId(null)
     }

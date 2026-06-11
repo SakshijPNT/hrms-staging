@@ -118,7 +118,7 @@ export function RegularizationApprovalsPage() {
                 <th>Original Status</th>
                 <th>Requested Correction</th>
                 <th>Reason</th>
-                <th>Actions</th>
+                <th className="table-action-col">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -157,8 +157,8 @@ export function RegularizationApprovalsPage() {
                     <td>{item.originalAttendanceStatus.replace('_', ' ')}</td>
                     <td>{formatCorrectionTypeLabel(item.requestedCorrectionType)}</td>
                     <td>{item.reason}</td>
-                    <td>
-                      <div className="reg-action-group">
+                    <td className="table-action-col">
+                      <div className="table-action-group reg-action-group">
                         <button
                           type="button"
                           className="act-submit-btn reg-action-btn"

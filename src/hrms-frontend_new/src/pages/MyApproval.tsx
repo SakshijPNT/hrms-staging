@@ -161,8 +161,6 @@ function MyApprovalContent() {
   const [search, setSearch] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [viewModalOpen, setViewModalOpen] = useState(false)
-  const [approveModalOpen, setApproveModalOpen] = useState(false)
-  const [rejectModalOpen, setRejectModalOpen] = useState(false)
   const [selectedRequest, setSelectedRequest] =
     useState<ApprovalRequest | null>(null)
   const [managerNote, setManagerNote] = useState('')
@@ -188,8 +186,6 @@ function MyApprovalContent() {
 
   const isModalOpen =
     viewModalOpen ||
-    approveModalOpen ||
-    rejectModalOpen ||
     balanceDetailOpen ||
     regReviewTarget != null
 
@@ -374,54 +370,20 @@ function MyApprovalContent() {
 
   function openViewModal(request: ApprovalRequest) {
     setSelectedRequest(request)
+    setManagerNote('')
+    setActionError('')
     setViewModalOpen(true)
   }
 
   function closeViewModal() {
     setViewModalOpen(false)
     setSelectedRequest(null)
-  }
-
-  function openApproveModal(request: ApprovalRequest) {
-    if (!request.canReview) {
-      return
-    }
-
-    setSelectedRequest(request)
-    setManagerNote('')
-    setActionError('')
-    setApproveModalOpen(true)
-  }
-
-  function closeApproveModal() {
-    setApproveModalOpen(false)
-    setSelectedRequest(null)
     setManagerNote('')
     setActionError('')
   }
 
-  function openRejectModal(request: ApprovalRequest) {
-    if (!request.canReview) {
-      return
-    }
-
-    setSelectedRequest(request)
-    setManagerNote('')
-    setActionError('')
-    setRejectModalOpen(true)
-  }
-
-  function closeRejectModal() {
-    setRejectModalOpen(false)
-    setSelectedRequest(null)
-    setManagerNote('')
-    setActionError('')
-  }
-
-  async function handleApproveSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-
-    if (!selectedRequest) {
+  async function handleApprove() {
+    if (!selectedRequest?.canReview) {
       return
     }
 
@@ -434,7 +396,7 @@ function MyApprovalContent() {
         { approverRemark: managerNote.trim() || null },
       )
 
-      closeApproveModal()
+      closeViewModal()
       await fetchApprovalRequests()
       await fetchLeaveBalances()
     } catch (err) {
@@ -448,15 +410,13 @@ function MyApprovalContent() {
     }
   }
 
-  async function handleRejectSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-
+  async function handleReject() {
     if (!managerNote.trim()) {
       setActionError('Rejection note is required.')
       return
     }
 
-    if (!selectedRequest) {
+    if (!selectedRequest?.canReview) {
       return
     }
 
@@ -469,7 +429,7 @@ function MyApprovalContent() {
         { approverRemark: managerNote.trim() },
       )
 
-      closeRejectModal()
+      closeViewModal()
       await fetchApprovalRequests()
     } catch (err) {
       const axiosError = err as AxiosError<{ message?: string }>
@@ -620,7 +580,7 @@ function MyApprovalContent() {
     <div className="act-page">
      
 
-      <div className="act-stats leaves-stats">
+      {/* <div className="act-stats leaves-stats">
           {balancesLoading ? (
             <div className="act-leave-card leaves-stats-loading">
               Loading leave balances...
@@ -664,12 +624,12 @@ function MyApprovalContent() {
               </div>
             ))
           )}
-        </div>
+        </div> */}
 
-        <div className="approval-tabs">
+        <div className="act-tabs approval-tabs">
           <button
             type="button"
-            className={`approval-tab${approvalTab === 'leave' ? ' approval-tab--active' : ''}`}
+            className={`act-tab approval-tab${approvalTab === 'leave' ? ' act-tab--active approval-tab--active' : ''}`}
             onClick={() => {
               setApprovalTab('leave')
               setCurrentPage(1)
@@ -679,7 +639,7 @@ function MyApprovalContent() {
           </button>
           <button
             type="button"
-            className={`approval-tab${approvalTab === 'regularization' ? ' approval-tab--active' : ''}`}
+            className={`act-tab approval-tab${approvalTab === 'regularization' ? ' act-tab--active approval-tab--active' : ''}`}
             onClick={() => {
               setApprovalTab('regularization')
               setRegStatusFilter('all')
@@ -786,7 +746,7 @@ function MyApprovalContent() {
                 <th>Start Date</th>
                 <th>End Date</th>
                 <th>Status</th>
-                <th>Action</th>
+                <th className="table-action-col">Action</th>
               </tr>
             </thead>
 
@@ -818,7 +778,7 @@ function MyApprovalContent() {
                         {request.status}
                       </span>
                     </td>
-                    <td>
+                    <td className="table-action-col">
                       <div className="table-action-group approval-action-group">
                         <button
                           type="button"
@@ -828,28 +788,6 @@ function MyApprovalContent() {
                           onClick={() => openViewModal(request)}
                         >
                           <FiEye />
-                        </button>
-
-                        <button
-                          type="button"
-                          className="approval-action-btn reject"
-                          title="Reject request"
-                          aria-label={`Reject request for ${request.userName}`}
-                          disabled={!request.canReview || actionId === request.id}
-                          onClick={() => openRejectModal(request)}
-                        >
-                          <FiX />
-                        </button>
-
-                        <button
-                          type="button"
-                          className="approval-action-btn approve"
-                          title="Approve request"
-                          aria-label={`Approve request for ${request.userName}`}
-                          disabled={!request.canReview || actionId === request.id}
-                          onClick={() => openApproveModal(request)}
-                        >
-                          <FiCheck />
                         </button>
                       </div>
                     </td>
@@ -901,7 +839,7 @@ function MyApprovalContent() {
                 <th>Correction</th>
                 <th>Reason</th>
                 <th>Status</th>
-                <th>Action</th>
+                <th className="table-action-col">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -940,7 +878,7 @@ function MyApprovalContent() {
                         {mapApprovalStatus(item.approvalStatus)}
                       </span>
                     </td>
-                    <td>
+                    <td className="table-action-col">
                       <div className="table-action-group approval-action-group">
                         <button
                           type="button"
@@ -998,151 +936,6 @@ function MyApprovalContent() {
             </div>
           )}
         </div>
-        )}
-
-        {approveModalOpen && selectedRequest && (
-          <div className="act-modal-overlay">
-            <div
-              className="act-modal modal-sm"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="act-modal-header">
-                <h2>Approval Request</h2>
-
-                <button
-                  type="button"
-                  className="act-modal-close"
-                  onClick={closeApproveModal}
-                >
-                  &times;
-                </button>
-              </div>
-
-              <form
-                id="approval-form"
-                className="act-modal-form approval-modal-form"
-                onSubmit={handleApproveSubmit}
-              >
-                <div className="act-form-row">
-                  <div className="approval-employee-reason">
-                    <span>Employee Reason</span>
-                    <p className="approval-employee-reason-value">
-                      {selectedRequest.requestNote}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="act-form-row">
-                  <label className="act-form-field">
-                    <span>Manager Note</span>
-                    <textarea
-                      className="approval-manager-note"
-                      placeholder="-Enter Text-"
-                      value={managerNote}
-                      onChange={(e) => setManagerNote(e.target.value)}
-                    />
-                  </label>
-                </div>
-
-                {actionError && <div className="form-error">{actionError}</div>}
-              </form>
-
-              <div className="act-modal-actions">
-                <button
-                  type="button"
-                  className="act-cancel-btn"
-                  onClick={closeApproveModal}
-                  disabled={actionId === selectedRequest.id}
-                >
-                  Cancel
-                </button>
-
-                <button
-                  type="submit"
-                  form="approval-form"
-                  className="act-submit-btn"
-                  disabled={actionId === selectedRequest.id}
-                >
-                  Approve
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {rejectModalOpen && selectedRequest && (
-          <div className="act-modal-overlay">
-            <div
-              className="act-modal modal-sm"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="act-modal-header">
-                <h2>Rejection Request</h2>
-
-                <button
-                  type="button"
-                  className="act-modal-close"
-                  onClick={closeRejectModal}
-                >
-                  &times;
-                </button>
-              </div>
-
-              <form
-                id="rejection-form"
-                className="act-modal-form approval-modal-form"
-                onSubmit={handleRejectSubmit}
-              >
-                <div className="act-form-row">
-                  <div className="approval-employee-reason">
-                    <span>Employee Reason</span>
-                    <p className="approval-employee-reason-value">
-                      {selectedRequest.requestNote}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="act-form-row">
-                  <label className="act-form-field">
-                    <span>Rejection Note / Manager Note *</span>
-                    <textarea
-                      className="approval-rejection-note"
-                      placeholder="-Enter Text-"
-                      value={managerNote}
-                      onChange={(e) => {
-                        setManagerNote(e.target.value)
-                        if (actionError) {
-                          setActionError('')
-                        }
-                      }}
-                    />
-                  </label>
-                </div>
-
-                {actionError && <div className="form-error">{actionError}</div>}
-              </form>
-
-              <div className="act-modal-actions">
-                <button
-                  type="button"
-                  className="act-cancel-btn"
-                  onClick={closeRejectModal}
-                  disabled={actionId === selectedRequest.id}
-                >
-                  Cancel
-                </button>
-
-                <button
-                  type="submit"
-                  form="rejection-form"
-                  className="act-reject-btn"
-                  disabled={actionId === selectedRequest.id}
-                >
-                  Reject
-                </button>
-              </div>
-            </div>
-          </div>
         )}
 
         {viewModalOpen && selectedRequest && (
@@ -1244,25 +1037,70 @@ function MyApprovalContent() {
 
                 <div className="act-form-row">
                   <label className="act-form-field">
-                    <span>Manager Note</span>
+                    <span>
+                      Manager Note
+                      {selectedRequest.canReview ? ' (required for reject)' : ''}
+                    </span>
                     <textarea
                       rows={3}
-                      className="approval-detail-readonly"
-                      value={selectedRequest.managerNote}
-                      readOnly
+                      className={
+                        selectedRequest.canReview
+                          ? 'approval-manager-note'
+                          : 'approval-detail-readonly'
+                      }
+                      placeholder={
+                        selectedRequest.canReview ? '-Enter Text-' : undefined
+                      }
+                      value={
+                        selectedRequest.canReview
+                          ? managerNote
+                          : selectedRequest.managerNote
+                      }
+                      readOnly={!selectedRequest.canReview}
+                      onChange={(event) => {
+                        setManagerNote(event.target.value)
+                        if (actionError) {
+                          setActionError('')
+                        }
+                      }}
                     />
                   </label>
                 </div>
+
+                {actionError && (
+                  <div className="form-error">{actionError}</div>
+                )}
               </div>
 
               <div className="act-modal-actions">
-                <button
-                  type="button"
-                  className="act-cancel-btn"
-                  onClick={closeViewModal}
-                >
-                  Close
-                </button>
+                {selectedRequest.canReview ? (
+                  <>
+                    <button
+                      type="button"
+                      className="act-reject-btn"
+                      disabled={actionId === selectedRequest.id}
+                      onClick={() => void handleReject()}
+                    >
+                      Reject
+                    </button>
+                    <button
+                      type="button"
+                      className="act-submit-btn"
+                      disabled={actionId === selectedRequest.id}
+                      onClick={() => void handleApprove()}
+                    >
+                      Approve
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className="act-cancel-btn"
+                    onClick={closeViewModal}
+                  >
+                    Close
+                  </button>
+                )}
               </div>
             </div>
           </div>

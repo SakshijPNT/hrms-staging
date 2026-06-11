@@ -45,23 +45,43 @@ function formatRegCorrectionLabel(item: {
   return base
 }
 
-function formatEscalationFlags(item: AdminRegularizationQueueItem) {
-  const flags: string[] = []
-
-  if (item.isNoApprover) {
-    flags.push('No Approver')
+function EscalationBadges({
+  item,
+}: {
+  item: AdminRegularizationQueueItem
+}) {
+  if (!item.adminCanAct) {
+    return (
+      <span className="admin-queue-badge admin-queue-badge--pending">
+        Awaiting manager
+      </span>
+    )
   }
 
-  if (item.isOverdue) {
-    flags.push(`Overdue (${item.pendingDays}d)`)
-  }
-
-  return flags.length > 0 ? flags.join(' · ') : 'Awaiting manager'
+  return (
+    <div className="admin-queue-badges">
+      {item.isNoApprover && (
+        <span className="admin-queue-badge admin-queue-badge--warning">
+          No approver
+        </span>
+      )}
+      {item.isOverdue && (
+        <span className="admin-queue-badge admin-queue-badge--danger">
+          Overdue ({item.pendingDays}d)
+        </span>
+      )}
+      {!item.isNoApprover && !item.isOverdue && (
+        <span className="admin-queue-badge admin-queue-badge--action">
+          Admin action
+        </span>
+      )}
+    </div>
+  )
 }
 
 export function OtherRequestsPage() {
   return (
-    <Layout title="Other Requests">
+    <Layout title="Admin Approval">
       <OtherRequestsContent />
     </Layout>
   )
@@ -109,11 +129,6 @@ function OtherRequestsContent() {
   useEffect(() => {
     setCurrentPage(1)
   }, [search, actionableOnly])
-
-  const actionableCount = useMemo(
-    () => queueItems.filter((item) => item.adminCanAct).length,
-    [queueItems],
-  )
 
   const filteredQueue = useMemo(() => {
     const query = search.toLowerCase().trim()
@@ -194,24 +209,6 @@ function OtherRequestsContent() {
 
   return (
     <div className="act-page">
-      <div className="act-page-header">
-        <div>
-          <h1 className="act-title">Other Requests</h1>
-          <p className="act-subtitle">
-            Admin override for overdue or unassigned regularization requests
-            across the organisation.
-            {actionableCount > 0 && (
-              <>
-                {' '}
-                <span className="other-requests-actionable-count">
-                  {actionableCount} actionable
-                </span>
-              </>
-            )}
-          </p>
-        </div>
-      </div>
-
       <div className="act-toolbar leaves-toolbar approval-toolbar">
         <div className="approval-search-wrapper">
           <FiSearch className="act-search-icon" />
@@ -224,13 +221,18 @@ function OtherRequestsContent() {
           />
         </div>
 
-        <label className="approval-filter-checkbox">
-          <input
-            type="checkbox"
-            checked={actionableOnly}
-            onChange={(e) => setActionableOnly(e.target.checked)}
-          />
-          Show actionable only
+        <label className="approval-filter-toggle">
+          <span className="approval-filter-toggle__label">
+            Show actionable only
+          </span>
+          <span className="role-switch approval-filter-switch">
+            <input
+              type="checkbox"
+              checked={actionableOnly}
+              onChange={(e) => setActionableOnly(e.target.checked)}
+            />
+            <span className="role-slider" />
+          </span>
         </label>
       </div>
 
@@ -245,7 +247,7 @@ function OtherRequestsContent() {
               <th>Raised</th>
               <th>Escalation</th>
               <th>Reason</th>
-              <th>Action</th>
+              <th className="table-action-col">Action</th>
             </tr>
           </thead>
           <tbody>
@@ -280,7 +282,9 @@ function OtherRequestsContent() {
                         <div className="act-date">{item.managerEmail}</div>
                       </>
                     ) : (
-                      <span className="other-requests-flag">No Approver</span>
+                      <span className="admin-queue-badge admin-queue-badge--warning">
+                        No approver
+                      </span>
                     )}
                   </td>
                   <td>{formatDisplayDate(normalizeDate(item.logDate))}</td>
@@ -291,18 +295,10 @@ function OtherRequestsContent() {
                     )}
                   </td>
                   <td>
-                    <span
-                      className={
-                        item.adminCanAct
-                          ? 'other-requests-flag other-requests-flag--alert'
-                          : 'act-date'
-                      }
-                    >
-                      {formatEscalationFlags(item)}
-                    </span>
+                    <EscalationBadges item={item} />
                   </td>
                   <td>{item.reason}</td>
-                  <td>
+                  <td className="table-action-col">
                     {item.adminCanAct ? (
                       <div className="table-action-group approval-action-group">
                         <button
@@ -325,7 +321,12 @@ function OtherRequestsContent() {
                         </button>
                       </div>
                     ) : (
-                      <span className="act-date">Manager path</span>
+                      <span
+                        className="admin-queue-route-badge"
+                        title="Pending manager approval"
+                      >
+                        Manager path
+                      </span>
                     )}
                   </td>
                 </tr>

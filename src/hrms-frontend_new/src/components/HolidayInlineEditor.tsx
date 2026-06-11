@@ -1,4 +1,12 @@
-import { FiPlus, FiTrash2 } from 'react-icons/fi'
+import { useState } from 'react'
+import { FiPlus, FiTrash2, FiCalendar } from 'react-icons/fi'
+import Select from 'react-select'
+import DatePicker from 'react-datepicker'
+import 'react-datepicker/dist/react-datepicker.css'
+import {
+  formatLocalDateIso,
+  parseLocalDate,
+} from '../utils/attendanceFormat'
 import '../styles/Style.css'
 
 export interface HolidayRow {
@@ -65,6 +73,44 @@ const emptyRow = (): HolidayRow => ({
   description: '',
 })
 
+interface HolidayDateCellProps {
+  value: string
+  min: string
+  max: string
+  onChange: (isoDate: string) => void
+}
+
+function HolidayDateCell({ value, min, max, onChange }: HolidayDateCellProps) {
+  const [isOpen, setIsOpen] = useState(false)
+
+  return (
+    <div className="holiday-date-picker-wrapper act-date-picker-wrapper">
+      <DatePicker
+        selected={value ? parseLocalDate(value) : null}
+        onChange={(date: Date | null) => {
+          onChange(date ? formatLocalDateIso(date) : '')
+          setIsOpen(false)
+        }}
+        minDate={parseLocalDate(min) ?? undefined}
+        maxDate={parseLocalDate(max) ?? undefined}
+        onInputClick={() => setIsOpen(true)}
+        open={isOpen}
+        onClickOutside={() => setIsOpen(false)}
+        placeholderText="Select date"
+        dateFormat="dd-MM-yyyy"
+        className="holiday-calendar-input act-date-picker"
+        popperClassName="act-datepicker-popper"
+        portalId="root"
+        popperPlacement="bottom-start"
+      />
+      <FiCalendar
+        className="act-date-icon"
+        onClick={() => setIsOpen((prev) => !prev)}
+      />
+    </div>
+  )
+}
+
 export default function HolidayInlineEditor({
   holidays,
   onChange,
@@ -77,6 +123,10 @@ export default function HolidayInlineEditor({
   const currentYear = new Date().getFullYear()
   const selectedYear = year ?? currentYear
   const yearOptions = buildYearOptions(currentYear)
+  const yearSelectOptions = yearOptions.map((optionYear) => ({
+    value: optionYear,
+    label: String(optionYear),
+  }))
 
   const subtitle = companyLabel
     ? `Holiday List – ${selectedYear} for ${companyLabel}${
@@ -129,19 +179,25 @@ export default function HolidayInlineEditor({
           {onYearChange && (
             <label className="holiday-year-field">
               <span>Year</span>
-              <select
-                value={selectedYear}
-                disabled={readOnly && !onYearChange}
-                onChange={(e) =>
-                  onYearChange(Number(e.target.value))
+              <Select
+                menuPortalTarget={document.body}
+                menuPosition="fixed"
+                menuPlacement="auto"
+                menuShouldScrollIntoView={false}
+                classNamePrefix="act-select"
+                isDisabled={readOnly && !onYearChange}
+                options={yearSelectOptions}
+                value={
+                  yearSelectOptions.find(
+                    (option) => option.value === selectedYear
+                  ) ?? null
                 }
-              >
-                {yearOptions.map((optionYear) => (
-                  <option key={optionYear} value={optionYear}>
-                    {optionYear}
-                  </option>
-                ))}
-              </select>
+                onChange={(selected) => {
+                  if (selected) {
+                    onYearChange(selected.value)
+                  }
+                }}
+              />
             </label>
           )}
 
@@ -211,18 +267,12 @@ export default function HolidayInlineEditor({
                     {readOnly || isSaved ? (
                       formatDisplayDate(holiday.holidayDate)
                     ) : (
-                      <input
-                        type="date"
-                        className="holiday-calendar-input"
+                      <HolidayDateCell
                         value={holiday.holidayDate}
                         min={yearDateMin}
                         max={yearDateMax}
-                        onChange={(e) =>
-                          updateRow(
-                            sourceIndex,
-                            'holidayDate',
-                            e.target.value
-                          )
+                        onChange={(isoDate) =>
+                          updateRow(sourceIndex, 'holidayDate', isoDate)
                         }
                       />
                     )}

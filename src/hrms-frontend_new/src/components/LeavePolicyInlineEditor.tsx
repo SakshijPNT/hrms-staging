@@ -1,4 +1,5 @@
 import { FiPlus, FiTrash2 } from 'react-icons/fi'
+import Select from 'react-select'
 import '../styles/Style.css'
 
 export interface LeaveTypeRow {
@@ -15,6 +16,11 @@ interface LeavePolicyInlineEditorProps {
   onChange: (rows: LeaveTypeRow[]) => void
   readOnly?: boolean
 }
+
+const CARRY_FORWARD_OPTIONS = [
+  { value: 'no', label: 'No' },
+  { value: 'yes', label: 'Yes' },
+]
 
 const emptyRow = (): LeaveTypeRow => ({
   leaveTypeName: '',
@@ -148,20 +154,29 @@ export default function LeavePolicyInlineEditor({
                   {readOnly ? (
                     row.isCarryForward ? 'Yes' : 'No'
                   ) : (
-                    <select
-                      className="holiday-calendar-input"
-                      value={row.isCarryForward ? 'yes' : 'no'}
-                      onChange={(e) =>
+                    <Select
+                      menuPortalTarget={document.body}
+                      menuPosition="fixed"
+                      menuPlacement="auto"
+                      menuShouldScrollIntoView={false}
+                      classNamePrefix="act-select"
+                      isSearchable={false}
+                      options={CARRY_FORWARD_OPTIONS}
+                      value={
+                        CARRY_FORWARD_OPTIONS.find(
+                          (option) =>
+                            option.value ===
+                            (row.isCarryForward ? 'yes' : 'no')
+                        ) ?? null
+                      }
+                      onChange={(selected) =>
                         updateRow(
                           index,
                           'isCarryForward',
-                          e.target.value === 'yes'
+                          selected?.value === 'yes'
                         )
                       }
-                    >
-                      <option value="no">No</option>
-                      <option value="yes">Yes</option>
-                    </select>
+                    />
                   )}
                 </td>
                 <td>

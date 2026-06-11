@@ -7,6 +7,11 @@ import { FiSearch, FiPlus, FiCalendar, FiEye } from 'react-icons/fi'
 import { MdEdit } from "react-icons/md";
 import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
+import { useAlert } from '../context/AlertContext'
+import {
+  formatLocalDateIso,
+  parseLocalDate,
+} from '../utils/attendanceFormat'
 
 interface ApiUser {
   id: number
@@ -53,6 +58,8 @@ type UserFieldErrors = {
 }
 
 export function UsersPage() {
+
+  const { showAlert, showConfirm } = useAlert()
 
   const [users, setUsers] = useState<UserItem[]>([])
   const [roles, setRoles] = useState<RoleItem[]>([])
@@ -280,7 +287,10 @@ export function UsersPage() {
   function handleEdit(user: UserItem) {
 
     if (!user.status) {
-      alert('First activate this user')
+      showAlert({
+        title: 'Activation Required',
+        message: 'First activate this user.',
+      })
       return
     }
 
@@ -321,7 +331,7 @@ export function UsersPage() {
         ? 'Are you sure you want to deactivate this user?'
         : 'Are you sure you want to activate this user?'
 
-      const confirmed = window.confirm(confirmMessage)
+      const confirmed = await showConfirm(confirmMessage)
 
       if (!confirmed) {
         return
@@ -353,7 +363,10 @@ export function UsersPage() {
         error
       )
 
-      alert('Failed to update user status')
+      showAlert({
+        title: 'Error',
+        message: 'Failed to update user status',
+      })
     }
   }
 
@@ -551,7 +564,7 @@ export function UsersPage() {
                 <th>Manager</th>
                 <th>Joining Date</th>
                 <th>Status</th>
-                <th>Actions</th>
+                <th className="table-action-col">Actions</th>
               </tr>
             </thead>
 
@@ -620,11 +633,11 @@ export function UsersPage() {
                       </div>
                     </td>
 
-                    <td>
-                      <div className="role-table-actions">
+                    <td className="table-action-col">
+                      <div className="table-action-group">
                         <button
                           type="button"
-                          className="role-action-btn"
+                          className="table-action-btn"
                           title="View user"
                           aria-label={`View user ${user.fullName}`}
                           onClick={() => openViewModal(user)}
@@ -634,7 +647,7 @@ export function UsersPage() {
 
                         <button
                           type="button"
-                          className="role-action-btn"
+                          className="table-action-btn"
                           title="Edit user"
                           aria-label={`Edit user ${user.fullName}`}
                           onClick={() => handleEdit(user)}
@@ -739,6 +752,7 @@ export function UsersPage() {
 
                     <input
                       type="text"
+                      placeholder="Enter full name"
                       value={form.fullName}
                       onChange={(e) => {
                         clearFieldError('fullName')
@@ -762,6 +776,7 @@ export function UsersPage() {
 
                     <input
                       type="email"
+                      placeholder="Enter email address"
                       value={form.emailId}
                       onChange={(e) => {
                         clearFieldError('emailId')
@@ -783,7 +798,7 @@ export function UsersPage() {
                 <div
                   className={`role-activities-section${fieldErrors.roleId ? ' role-activities-section--invalid' : ''}`}
                 >
-                  <h3 className="role-activities-title">Role *</h3>
+                  <span className="role-activities-title">Role *</span>
                   <div className="act-search-wrapper role-activities-search-wrapper">
                     <FiSearch className="act-search-icon" />
                     <input
@@ -797,8 +812,8 @@ export function UsersPage() {
                   <div className="role-activities-table">
                     <div className="role-activities-list-header role-activities-list-grid">
                       <span className="role-activities-col-check" aria-hidden="true" />
-                      <span>Role ID</span>
-                      <span>Role Name</span>
+                      <span className="role-activities-col-id">Role ID</span>
+                      <span className="role-activities-col-name">Role Name</span>
                     </div>
                     <div className="role-activities-list">
                       {roles.length === 0 ? (
@@ -839,7 +854,7 @@ export function UsersPage() {
                 <div
                   className={`role-activities-section${fieldErrors.managerId ? ' role-activities-section--invalid' : ''}`}
                 >
-                  <h3 className="role-activities-title">Manager *</h3>
+                  <span className="role-activities-title">Manager *</span>
                   <div className="act-search-wrapper role-activities-search-wrapper">
                     <FiSearch className="act-search-icon" />
                     <input
@@ -855,8 +870,8 @@ export function UsersPage() {
                   <div className="role-activities-table">
                     <div className="role-activities-list-header role-activities-list-grid">
                       <span className="role-activities-col-check" aria-hidden="true" />
-                      <span>ID</span>
-                      <span>Manager Name</span>
+                      <span className="role-activities-col-id">ID</span>
+                      <span className="role-activities-col-name">Manager Name</span>
                     </div>
                     <div className="role-activities-list">
                       {managerChoices.length === 0 ? (
@@ -919,7 +934,7 @@ export function UsersPage() {
                       <DatePicker
                         selected={
                           form.joiningDate
-                            ? new Date(form.joiningDate)
+                            ? parseLocalDate(form.joiningDate)
                             : null
                         }
                         onChange={(date: Date | null) => {
@@ -927,7 +942,7 @@ export function UsersPage() {
                           setForm((c) => ({
                             ...c,
                             joiningDate: date
-                              ? date.toISOString().split('T')[0]
+                              ? formatLocalDateIso(date)
                               : '',
                           }))
 
@@ -986,14 +1001,14 @@ export function UsersPage() {
                       <DatePicker
                         selected={
                           form.confirmationDate
-                            ? new Date(form.confirmationDate)
+                            ? parseLocalDate(form.confirmationDate)
                             : null
                         }
                         onChange={(date: Date | null) => {
                           setForm((c) => ({
                             ...c,
                             confirmationDate: date
-                              ? date.toISOString().split('T')[0]
+                              ? formatLocalDateIso(date)
                               : '',
                           }))
 
@@ -1058,7 +1073,7 @@ export function UsersPage() {
         {viewModalOpen && viewUser && (
           <div className="act-modal-overlay">
             <div
-              className="act-modal modal-md"
+              className="act-modal modal-sm role-view-modal"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="act-modal-header">
@@ -1072,81 +1087,88 @@ export function UsersPage() {
                 </button>
               </div>
 
-              <div className="act-modal-form role-modal-form role-view-form">
-                <div className="role-view-field">
-                  <span className="role-view-label">User ID</span>
-                  <p className="role-view-value">{viewUser.id}</p>
-                </div>
+              <div className="act-modal-form role-view-form">
+                <div className="role-view-grid">
+                  <div className="role-view-field">
+                    <span className="role-view-label">User ID</span>
+                    <p className="role-view-value-box">{viewUser.id}</p>
+                  </div>
 
-                <div className="role-view-field">
-                  <span className="role-view-label">Full Name</span>
-                  <p className="role-view-value">{viewUser.fullName}</p>
-                </div>
+                  <div className="role-view-field">
+                    <span className="role-view-label">Status</span>
+                    <p className="role-view-value-box role-view-value-box--badge">
+                      <span
+                        className={
+                          viewUser.status
+                            ? 'role-status role-status-active'
+                            : 'role-status role-status-inactive'
+                        }
+                      >
+                        {viewUser.status ? 'Active' : 'Inactive'}
+                      </span>
+                    </p>
+                  </div>
 
-                <div className="role-view-field">
-                  <span className="role-view-label">Email</span>
-                  <p className="role-view-value">{viewUser.emailId}</p>
-                </div>
+                  <div className="role-view-field role-view-field--full">
+                    <span className="role-view-label">Full Name</span>
+                    <p className="role-view-value-box">{viewUser.fullName}</p>
+                  </div>
 
-                <div className="role-view-field">
-                  <span className="role-view-label">Role</span>
-                  <p className="role-view-value">
-                    {viewUser.roleName || '-'}
-                  </p>
-                </div>
+                  <div className="role-view-field role-view-field--full">
+                    <span className="role-view-label">Email</span>
+                    <p className="role-view-value-box">{viewUser.emailId}</p>
+                  </div>
 
-                <div className="role-view-field">
-                  <span className="role-view-label">Manager</span>
-                  <p className="role-view-value">
-                    {viewUser.managerName || '-'}
-                  </p>
-                </div>
+                  <div className="role-view-field">
+                    <span className="role-view-label">Role</span>
+                    <p className="role-view-value-box">
+                      {viewUser.roleName || '-'}
+                    </p>
+                  </div>
 
-                <div className="role-view-field">
-                  <span className="role-view-label">Joining Date</span>
-                  <p className="role-view-value">{viewUser.joiningDate}</p>
-                </div>
+                  <div className="role-view-field">
+                    <span className="role-view-label">Manager</span>
+                    <p className="role-view-value-box">
+                      {viewUser.managerName || '-'}
+                    </p>
+                  </div>
 
-                <div className="role-view-field">
-                  <span className="role-view-label">Probation Months</span>
-                  <p className="role-view-value">{viewUser.probationMonths}</p>
-                </div>
+                  <div className="role-view-field">
+                    <span className="role-view-label">Joining Date</span>
+                    <p className="role-view-value-box">
+                      {viewUser.joiningDate}
+                    </p>
+                  </div>
 
-                <div className="role-view-field">
-                  <span className="role-view-label">Confirmation Date</span>
-                  <p className="role-view-value">
-                    {viewUser.confirmationDate || '-'}
-                  </p>
-                </div>
+                  <div className="role-view-field">
+                    <span className="role-view-label">Confirmation Date</span>
+                    <p className="role-view-value-box">
+                      {viewUser.confirmationDate || '-'}
+                    </p>
+                  </div>
 
-                <div className="role-view-field">
-                  <span className="role-view-label">Status</span>
-                  <p className="role-view-value">
-                    <span
-                      className={
-                        viewUser.status
-                          ? 'role-status role-status-active'
-                          : 'role-status role-status-inactive'
-                      }
-                    >
-                      {viewUser.status ? 'Active' : 'Inactive'}
-                    </span>
-                  </p>
+                  <div className="role-view-field role-view-field--full">
+                    <span className="role-view-label">Probation Months</span>
+                    <p className="role-view-value-box">
+                      {viewUser.probationMonths}
+                    </p>
+                  </div>
                 </div>
+              </div>
 
-                <div className="act-modal-actions">
-                  <button
-                    type="button"
-                    className="act-cancel-btn"
-                    onClick={closeViewModal}
-                  >
-                    Close
-                  </button>
-                </div>
+              <div className="act-modal-actions">
+                <button
+                  type="button"
+                  className="act-cancel-btn"
+                  onClick={closeViewModal}
+                >
+                  Close
+                </button>
               </div>
             </div>
           </div>
         )}
+
       </div>
     </Layout>
   )

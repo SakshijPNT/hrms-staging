@@ -23,8 +23,12 @@ import {
   LeaveBalanceDetailModal,
   type LeaveBalanceDetail,
 } from '../components/LeaveBalanceDetailModal'
-import { normalizeDate } from '../utils/attendanceFormat'
+import {
+  getLocalTodayIso,
+  normalizeDate,
+} from '../utils/attendanceFormat'
 import type { AxiosError } from 'axios'
+import { useAlert } from '../context/AlertContext'
 
 interface LeaveBalanceCard {
   leaveTypeId: number
@@ -146,11 +150,13 @@ function canModifyApplication(item: ApiLeaveApplication) {
     return false
   }
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = getLocalTodayIso()
   return fromDate > today
 }
 
 export function MyLeavesPage() {
+  const { showAlert, showConfirm } = useAlert()
+
   const [leaveBalances, setLeaveBalances] = useState<LeaveBalanceCard[]>([])
   const [balancesLoading, setBalancesLoading] = useState(true)
   const [leaveApplications, setLeaveApplications] = useState<
@@ -340,11 +346,11 @@ export function MyLeavesPage() {
       return
     }
 
-    if (
-      !window.confirm(
-        'Delete this leave request? This action cannot be undone.',
-      )
-    ) {
+    const confirmed = await showConfirm(
+      'Delete this leave request? This action cannot be undone.',
+    )
+
+    if (!confirmed) {
       return
     }
 
@@ -359,7 +365,10 @@ export function MyLeavesPage() {
       const message =
         axiosError.response?.data?.message ??
         'Failed to delete leave request.'
-      window.alert(message)
+      showAlert({
+        title: 'Error',
+        message,
+      })
     } finally {
       setActionId(null)
     }
@@ -445,18 +454,18 @@ export function MyLeavesPage() {
                     <button
                       type="button"
                       className="act-leave-card-stat-btn"
-                      onClick={() =>
-                        void openBalanceDetail(leave.leaveTypeId)
-                      }
+                      // onClick={() =>
+                      //   void openBalanceDetail(leave.leaveTypeId)
+                      // }
                     >
                       Used: {formatLeaveDays(leave.used)}
                     </button>
                     <button
                       type="button"
                       className="act-leave-card-stat-btn"
-                      onClick={() =>
-                        void openBalanceDetail(leave.leaveTypeId)
-                      }
+                      // onClick={() =>
+                      //   void openBalanceDetail(leave.leaveTypeId)
+                      // }
                     >
                       Pending: {formatLeaveDays(leave.pending)}
                     </button>
@@ -532,7 +541,7 @@ export function MyLeavesPage() {
                 <th>Request Note</th>
                 <th>Status</th>
                 <th>Manager Note</th>
-                <th>Action</th>
+                <th className="table-action-col">Action</th>
               </tr>
             </thead>
 
@@ -575,11 +584,11 @@ export function MyLeavesPage() {
                       </span>
                     </td>
                     <td>{request.managerNote}</td>
-                    <td>
+                    <td className="table-action-col">
                       <div className="table-action-group">
                         <button
                           type="button"
-                          className="leave-table-action-btn"
+                          className="table-action-btn"
                           title="View request"
                           aria-label={`View leave request ${request.id}`}
                           onClick={() => openViewModal(request.id)}
@@ -589,7 +598,7 @@ export function MyLeavesPage() {
 
                         <button
                           type="button"
-                          className="leave-table-action-btn"
+                          className="table-action-btn"
                           title="Edit request"
                           aria-label={`Edit leave request ${request.id}`}
                           disabled={!canModify || actionId === request.id}
@@ -600,7 +609,7 @@ export function MyLeavesPage() {
 
                         <button
                           type="button"
-                          className="leave-table-action-btn"
+                          className="table-action-btn"
                           title="Delete request"
                           aria-label={`Delete leave request ${request.id}`}
                           disabled={!canModify || actionId === request.id}

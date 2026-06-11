@@ -11,6 +11,7 @@ import { FiSearch, FiPlus, FiEye } from 'react-icons/fi'
 import { MdEdit } from 'react-icons/md'
 import type { AxiosError } from 'axios'
 import type { SessionInfo } from '../../types/auth'
+import { useAlert } from '../context/AlertContext'
 
 interface RoleManagementItem {
   id: number
@@ -32,6 +33,8 @@ type RoleFieldErrors = {
 }
 
 export function RolesPage() {
+
+  const { showAlert, showConfirm } = useAlert()
 
   const [activities, setActivities] = useState<ActivityItem[]>([])
   const [roles, setRoles] = useState<RoleManagementItem[]>([])
@@ -315,7 +318,7 @@ export function RolesPage() {
         ? 'Are you sure you want to deactivate this role?'
         : 'Are you sure you want to activate this role?'
 
-      const confirmed = window.confirm(confirmMessage)
+      const confirmed = await showConfirm(confirmMessage)
 
       if (!confirmed) {
         return
@@ -338,7 +341,10 @@ export function RolesPage() {
         error
       )
 
-      alert('Failed to update role status')
+      showAlert({
+        title: 'Error',
+        message: 'Failed to update role status',
+      })
     }
   }
 
@@ -346,7 +352,10 @@ export function RolesPage() {
 
     // inactive role check
     if (!role.status) {
-      alert('First activate this role')
+      showAlert({
+        title: 'Activation Required',
+        message: 'First activate this role.',
+      })
       return
     }
 
@@ -541,7 +550,7 @@ export function RolesPage() {
                 <th>Description</th>
                 <th>Activity</th>
                 <th>Status</th>
-                <th>Action</th>
+                <th className="table-action-col">Action</th>
               </tr>
             </thead>
 
@@ -581,8 +590,8 @@ export function RolesPage() {
                       </span>
                     </td>
 
-                    <td>
-                      <div className="role-table-actions">
+                    <td className="table-action-col">
+                      <div className="table-action-group role-table-actions">
                         <label className="role-switch" title={role.status ? 'Deactivate role' : 'Activate role'}>
                           <input
                             type="checkbox"
@@ -601,7 +610,7 @@ export function RolesPage() {
 
                         <button
                           type="button"
-                          className="role-action-btn"
+                          className="table-action-btn"
                           title="View role"
                           aria-label={`View role ${role.name}`}
                           onClick={() => openViewModal(role)}
@@ -611,7 +620,7 @@ export function RolesPage() {
 
                         <button
                           type="button"
-                          className="role-action-btn"
+                          className="table-action-btn"
                           title="Edit role"
                           aria-label={`Edit role ${role.name}`}
                           onClick={() => handleEdit(role)}
@@ -680,7 +689,11 @@ export function RolesPage() {
                 </button>
               </div>
 
-              <form className="act-modal-form role-modal-form" onSubmit={handleSubmit}>
+              <form
+                id="role-form"
+                className="act-modal-form role-modal-form"
+                onSubmit={handleSubmit}
+              >
                 <label
                   className={`act-form-field role-modal-field${fieldErrors.name ? ' act-form-field--invalid' : ''}`}
                 >
@@ -727,7 +740,7 @@ export function RolesPage() {
                 <div
                   className={`role-activities-section${fieldErrors.activityIds ? ' role-activities-section--invalid' : ''}`}
                 >
-                  <h3 className="role-activities-title">Assign Activities *</h3>
+                  <span className="role-activities-title">Assign Activities *</span>
                   <div className="act-search-wrapper role-activities-search-wrapper">
                     <FiSearch className="act-search-icon" />
                     <input
@@ -772,21 +785,25 @@ export function RolesPage() {
 
                 {error && <div className="form-error">{error}</div>}
 
-                <div className="act-modal-actions">
-                  <button
-                    type="button"
-                    className="act-cancel-btn"
-                    onClick={closeModal}
-                    disabled={submitting}
-                  >
-                    Cancel
-                  </button>
+             
+              </form>
 
-                  <button
-                    type="submit"
-                    className="act-submit-btn"
-                    disabled={submitting}
-                  >
+              <div className="act-modal-actions">
+                <button
+                  type="button"
+                  className="act-cancel-btn"
+                  onClick={closeModal}
+                  disabled={submitting}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  form="role-form"
+                  className="act-submit-btn"
+                  disabled={submitting}
+                >
                     {submitting
                       ? 'Saving...'
                       : editingRoleId
@@ -794,7 +811,6 @@ export function RolesPage() {
                         : 'Submit'}
                   </button>
                 </div>
-              </form>
             </div>
           </div>
         )}
@@ -838,8 +854,9 @@ export function RolesPage() {
                     ))
                   )}
                 </div>
+                </div>
 
-                <div className="act-modal-actions">
+                              <div className="act-modal-actions">
                   <button
                     type="button"
                     className="act-cancel-btn"
@@ -848,7 +865,6 @@ export function RolesPage() {
                     Close
                   </button>
                 </div>
-              </div>
             </div>
           </div>
         )}
@@ -856,7 +872,7 @@ export function RolesPage() {
         {viewModalOpen && viewRole && (
           <div className="act-modal-overlay">
             <div
-              className="act-modal modal-md"
+              className="act-modal modal-sm role-view-modal"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="act-modal-header">
@@ -870,61 +886,72 @@ export function RolesPage() {
                 </button>
               </div>
 
-              <div className="act-modal-form role-modal-form role-view-form">
-                <div className="role-view-field">
-                  <span className="role-view-label">Role ID</span>
-                  <p className="role-view-value">{viewRole.id}</p>
-                </div>
+              <div className="act-modal-form role-view-form">
+                <div className="role-view-grid">
+                  <div className="role-view-field">
+                    <span className="role-view-label">Role ID</span>
+                    <p className="role-view-value-box">{viewRole.id}</p>
+                  </div>
 
-                <div className="role-view-field">
-                  <span className="role-view-label">Role Name</span>
-                  <p className="role-view-value">{viewRole.name}</p>
-                </div>
+                  <div className="role-view-field">
+                    <span className="role-view-label">Status</span>
+                    <p className="role-view-value-box role-view-value-box--badge">
+                      <span
+                        className={
+                          viewRole.status
+                            ? 'role-status role-status-active'
+                            : 'role-status role-status-inactive'
+                        }
+                      >
+                        {viewRole.status ? 'Active' : 'Inactive'}
+                      </span>
+                    </p>
+                  </div>
 
-                <div className="role-view-field">
-                  <span className="role-view-label">Description</span>
-                  <p className="role-view-value">{viewRole.description || '-'}</p>
-                </div>
+                  <div className="role-view-field role-view-field--full">
+                    <span className="role-view-label">Role Name</span>
+                    <p className="role-view-value-box">{viewRole.name}</p>
+                  </div>
 
-                <div className="role-view-field">
-                  <span className="role-view-label">Status</span>
-                  <p className="role-view-value">
-                    <span
-                      className={
-                        viewRole.status
-                          ? 'role-status role-status-active'
-                          : 'role-status role-status-inactive'
-                      }
-                    >
-                      {viewRole.status ? 'Active' : 'Inactive'}
-                    </span>
-                  </p>
-                </div>
+                  <div className="role-view-field role-view-field--full">
+                    <span className="role-view-label">Description</span>
+                    <p className="role-view-value-box">
+                      {viewRole.description || '-'}
+                    </p>
+                  </div>
 
-                <div className="role-activities-section">
-                  <h3 className="role-activities-title">Assigned Activities</h3>
-                  <div className="role-activities-list role-view-activities">
-                    {viewRole.activity.length === 0 ? (
-                      <p className="role-activities-empty">No activities assigned.</p>
-                    ) : (
-                      viewRole.activity.map((activityName) => (
-                        <div key={activityName} className="role-activity-item role-view-activity-item">
-                          <span>{activityName}</span>
+                  <div className="role-view-field role-view-field--full">
+                    <span className="role-view-label">Assigned Activities</span>
+                    <div className="role-view-value-box role-view-value-box--list">
+                      {viewRole.activity.length === 0 ? (
+                        <p className="role-view-activities-empty">
+                          No activities assigned.
+                        </p>
+                      ) : (
+                        <div className="role-view-activities-list">
+                          {viewRole.activity.map((activityName) => (
+                            <p
+                              key={activityName}
+                              className="role-view-activity-row"
+                            >
+                              {activityName}
+                            </p>
+                          ))}
                         </div>
-                      ))
-                    )}
+                      )}
+                    </div>
                   </div>
                 </div>
+              </div>
 
-                <div className="act-modal-actions">
-                  <button
-                    type="button"
-                    className="act-cancel-btn"
-                    onClick={closeViewModal}
-                  >
-                    Close
-                  </button>
-                </div>
+              <div className="act-modal-actions">
+                <button
+                  type="button"
+                  className="act-cancel-btn"
+                  onClick={closeViewModal}
+                >
+                  Close
+                </button>
               </div>
             </div>
           </div>

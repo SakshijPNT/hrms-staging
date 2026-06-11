@@ -10,7 +10,55 @@ import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
 import { FiCalendar } from 'react-icons/fi'
 import api from '../services/api'
+import {
+  formatLocalDateIso,
+  normalizeDate,
+  parseLocalDate,
+} from '../utils/attendanceFormat'
 import '../styles/Style.css'
+
+type SubLeaveType = 'FULL_DAY' | 'FIRST_HALF' | 'SECOND_HALF'
+
+const SUB_LEAVE_TYPE_OPTIONS: {
+  value: SubLeaveType
+  label: string
+}[] = [
+  { value: 'FULL_DAY', label: 'Full Day' },
+  { value: 'FIRST_HALF', label: 'Half Day - First Half' },
+  { value: 'SECOND_HALF', label: 'Half Day - Second Half' },
+]
+
+function subLeaveTypeFromEdit(
+  application: LeaveApplicationEditData,
+): SubLeaveType {
+  if (!application.isHalfDay) {
+    return 'FULL_DAY'
+  }
+
+  if (application.session === 'SECOND_HALF') {
+    return 'SECOND_HALF'
+  }
+
+  return 'FIRST_HALF'
+}
+
+function isHalfDayLeave(subLeaveType: SubLeaveType) {
+  return subLeaveType !== 'FULL_DAY'
+}
+
+function sessionFromSubLeaveType(
+  subLeaveType: SubLeaveType,
+): string | null {
+  if (subLeaveType === 'FIRST_HALF') {
+    return 'FIRST_HALF'
+  }
+
+  if (subLeaveType === 'SECOND_HALF') {
+    return 'SECOND_HALF'
+  }
+
+  return null
+}
 
 interface LeaveType {
   id: number
@@ -50,11 +98,12 @@ export function ApplyLeaveModal({
     leaveTypeId: '',
     fromDate: '',
     toDate: '',
-    isHalfDay: false,
-    session: '',
-    workHours: '',
+    subLeaveType: 'FULL_DAY' as SubLeaveType,
     reason: '',
   })
+
+  const isHalfDay = isHalfDayLeave(form.subLeaveType)
+  const session = sessionFromSubLeaveType(form.subLeaveType)
 
   const leaveTypeOptions = useMemo(
     () =>
@@ -63,6 +112,15 @@ export function ApplyLeaveModal({
         label: leave.leaveTypeName,
       })),
     [leaveTypes],
+  )
+
+  const subLeaveTypeOptions = useMemo(
+    () =>
+      SUB_LEAVE_TYPE_OPTIONS.map((option) => ({
+        value: option.value,
+        label: option.label,
+      })),
+    [],
   )
 
   useEffect(() => {
@@ -75,9 +133,7 @@ export function ApplyLeaveModal({
         leaveTypeId: String(editApplication.leaveTypeId),
         fromDate: normalizeDate(editApplication.fromDate),
         toDate: normalizeDate(editApplication.toDate),
-        isHalfDay: editApplication.isHalfDay,
-        session: editApplication.session ?? '',
-        workHours: '',
+        subLeaveType: subLeaveTypeFromEdit(editApplication),
         reason: editApplication.reason ?? '',
       })
     } else {
@@ -85,9 +141,7 @@ export function ApplyLeaveModal({
         leaveTypeId: '',
         fromDate: '',
         toDate: '',
-        isHalfDay: false,
-        session: '',
-        workHours: '',
+        subLeaveType: 'FULL_DAY',
         reason: '',
       })
     }
@@ -106,12 +160,7 @@ export function ApplyLeaveModal({
       return
     }
 
-    if (!form.isHalfDay && !form.toDate) {
-      setMonthlyWarning('')
-      return
-    }
-
-    if (form.isHalfDay && !form.session) {
+    if (!isHalfDay && !form.toDate) {
       setMonthlyWarning('')
       return
     }
@@ -126,9 +175,10 @@ export function ApplyLeaveModal({
     form.leaveTypeId,
     form.fromDate,
     form.toDate,
-    form.isHalfDay,
-    form.session,
+    form.subLeaveType,
     editApplication?.id,
+    isHalfDay,
+    session,
   ])
 
   async function fetchMonthlyPreview() {
@@ -136,12 +186,12 @@ export function ApplyLeaveModal({
       const params: Record<string, string | number | boolean> = {
         leaveTypeId: Number(form.leaveTypeId),
         fromDate: form.fromDate,
-        toDate: form.isHalfDay ? form.fromDate : form.toDate,
-        isHalfDay: form.isHalfDay,
+        toDate: isHalfDay ? form.fromDate : form.toDate,
+        isHalfDay,
       }
 
-      if (form.isHalfDay) {
-        params.session = form.session
+      if (isHalfDay && session) {
+        params.session = session
       }
 
       if (editApplication) {
@@ -163,10 +213,6 @@ export function ApplyLeaveModal({
     }
   }
 
-  function normalizeDate(value: string) {
-    return value.slice(0, 10)
-  }
-
   async function fetchLeaveTypes() {
     try {
       const response = await api.get<LeaveType[]>('/user-leaves/leave-types')
@@ -185,13 +231,8 @@ export function ApplyLeaveModal({
       return
     }
 
-    if (!form.isHalfDay && !form.toDate) {
+    if (!isHalfDay && !form.toDate) {
       setError('Please select a to date.')
-      return
-    }
-
-    if (form.isHalfDay && !form.session) {
-      setError('Please select session for half day leave.')
       return
     }
 
@@ -202,9 +243,9 @@ export function ApplyLeaveModal({
       const payload = {
         leaveTypeId: Number(form.leaveTypeId),
         fromDate: form.fromDate,
-        toDate: form.isHalfDay ? form.fromDate : form.toDate,
-        isHalfDay: form.isHalfDay,
-        session: form.isHalfDay ? form.session : null,
+        toDate: isHalfDay ? form.fromDate : form.toDate,
+        isHalfDay,
+        session: isHalfDay ? session : null,
         reason: form.reason.trim(),
       }
 
@@ -282,40 +323,35 @@ export function ApplyLeaveModal({
             </label>
 
             <label className="act-form-field">
-              <span>Half Day *</span>
-              <div className="halfday-radio-group">
-                <label className="halfday-radio">
-                  <input
-                    type="radio"
-                    name="halfDay"
-                    checked={form.isHalfDay === true}
-                    onChange={() =>
-                      setForm((current) => ({
-                        ...current,
-                        isHalfDay: true,
-                        toDate: current.fromDate,
-                      }))
-                    }
-                  />
-                  <span>True</span>
-                </label>
-                <label className="halfday-radio">
-                  <input
-                    type="radio"
-                    name="halfDay"
-                    checked={form.isHalfDay === false}
-                    onChange={() =>
-                      setForm((current) => ({
-                        ...current,
-                        isHalfDay: false,
-                        session: '',
-                        workHours: '',
-                      }))
-                    }
-                  />
-                  <span>False</span>
-                </label>
-              </div>
+              <span>Sub Leave Type *</span>
+
+              <Select
+                menuPortalTarget={document.body}
+                menuPosition="fixed"
+                menuPlacement="auto"
+                menuShouldScrollIntoView={false}
+                classNamePrefix="act-select"
+                options={subLeaveTypeOptions}
+                placeholder="Select Sub Leave Type"
+                value={
+                  subLeaveTypeOptions.find(
+                    (option) => option.value === form.subLeaveType,
+                  ) || null
+                }
+                onChange={(selected) => {
+                  const subLeaveType =
+                    (selected?.value as SubLeaveType | undefined) ??
+                    'FULL_DAY'
+
+                  setForm((current) => ({
+                    ...current,
+                    subLeaveType,
+                    toDate: isHalfDayLeave(subLeaveType)
+                      ? current.fromDate
+                      : current.toDate,
+                  }))
+                }}
+              />
             </label>
           </div>
 
@@ -325,16 +361,16 @@ export function ApplyLeaveModal({
 
               <div className="act-date-picker-wrapper">
                 <DatePicker
-                  selected={form.fromDate ? new Date(form.fromDate) : null}
+                  selected={
+                    form.fromDate ? parseLocalDate(form.fromDate) : null
+                  }
                   onChange={(date: Date | null) => {
-                    const formattedDate = date
-                      ? date.toISOString().split('T')[0]
-                      : ''
+                    const formattedDate = date ? formatLocalDateIso(date) : ''
 
                     setForm((current) => ({
                       ...current,
                       fromDate: formattedDate,
-                      toDate: current.isHalfDay
+                      toDate: isHalfDayLeave(current.subLeaveType)
                         ? formattedDate
                         : current.toDate,
                     }))
@@ -364,11 +400,11 @@ export function ApplyLeaveModal({
 
               <div className="act-date-picker-wrapper">
                 <DatePicker
-                  selected={form.toDate ? new Date(form.toDate) : null}
+                  selected={form.toDate ? parseLocalDate(form.toDate) : null}
                   onChange={(date: Date | null) => {
                     setForm((current) => ({
                       ...current,
-                      toDate: date ? date.toISOString().split('T')[0] : '',
+                      toDate: date ? formatLocalDateIso(date) : '',
                     }))
 
                     setIsToDateOpen(false)
@@ -382,15 +418,15 @@ export function ApplyLeaveModal({
                   popperClassName="act-datepicker-popper"
                   portalId="root"
                   popperPlacement="bottom-start"
-                  disabled={form.isHalfDay}
+                  disabled={isHalfDay}
                 />
 
                 <FiCalendar
                   className={`act-date-icon ${
-                    form.isHalfDay ? 'disabled-date-icon' : ''
+                    isHalfDay ? 'disabled-date-icon' : ''
                   }`}
                   onClick={() => {
-                    if (!form.isHalfDay) {
+                    if (!isHalfDay) {
                       setIsToDateOpen((prev) => !prev)
                     }
                   }}
@@ -399,70 +435,7 @@ export function ApplyLeaveModal({
             </label>
           </div>
 
-          {form.isHalfDay && (
-            <div className="act-form-row">
-              <label className="act-form-field">
-                <span>Session *</span>
-
-                <Select
-                  menuPortalTarget={document.body}
-                  menuPosition="fixed"
-                  menuPlacement="auto"
-                  menuShouldScrollIntoView={false}
-                  classNamePrefix="act-select"
-                  placeholder="Select Session"
-                  options={[
-                    {
-                      value: 'FIRST_HALF',
-                      label: 'First Half',
-                    },
-                    {
-                      value: 'SECOND_HALF',
-                      label: 'Second Half',
-                    },
-                  ]}
-                  value={
-                    form.session
-                      ? {
-                          value: form.session,
-                          label:
-                            form.session === 'FIRST_HALF'
-                              ? 'First Half'
-                              : 'Second Half',
-                        }
-                      : null
-                  }
-                  onChange={(selected) =>
-                    setForm((current) => ({
-                      ...current,
-                      session: selected ? selected.value : '',
-                    }))
-                  }
-                />
-              </label>
-            </div>
-          )}
-
           <div className="act-form-row">
-            {form.isHalfDay && (
-              <label className="act-form-field">
-                <span>Work Hours</span>
-                <input
-                  type="number"
-                  min="0"
-                  max="24"
-                  value={form.workHours}
-                  placeholder="Enter work hours"
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      workHours: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-            )}
-
             <label className="act-form-field">
               <span>Reason *</span>
               <textarea

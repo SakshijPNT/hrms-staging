@@ -7,6 +7,7 @@ import Layout from './Layout'
 import '../styles/Style.css'
 import api from '../services/api'
 import { useSession } from '../context/SessionContext'
+import { useAlert } from '../context/AlertContext'
 import type { AxiosError } from 'axios'
 import RegularizationModal from '../components/RegularizationModal'
 import { FiCalendar } from 'react-icons/fi'
@@ -218,6 +219,8 @@ export default function Dashboard() {
 
 function DashboardPage() {
 
+  const { showAlert } = useAlert()
+
   const [attendance, setAttendance] = useState<Attendance | null>(null)
 
   const [currentTime, setCurrentTime] =
@@ -341,7 +344,10 @@ function DashboardPage() {
 
   const handleCheckIn = async () => {
     if (attendance?.checkInTime) {
-      alert('You have already checked in today.')
+      showAlert({
+        title: 'Check In',
+        message: 'You have already checked in today.',
+      })
       return
     }
 
@@ -354,15 +360,20 @@ function DashboardPage() {
       setAttendance(response.data)
 
       refreshMonthlyIfCurrent()
-      alert('Checked in successfully')
+      showAlert({
+        title: 'Success',
+        message: 'Checked in successfully',
+      })
     } catch (error: unknown) {
       const axiosError =
         error as AxiosError<{ message?: string }>
 
-      alert(
-        axiosError.response?.data?.message ||
-        'Check-in failed'
-      )
+      showAlert({
+        title: 'Error',
+        message:
+          axiosError.response?.data?.message ||
+          'Check-in failed',
+      })
     } finally {
       setLoading(false)
     }
@@ -378,15 +389,20 @@ function DashboardPage() {
       setAttendance(response.data)
 
       refreshMonthlyIfCurrent()
-      alert('Checked out successfully')
+      showAlert({
+        title: 'Success',
+        message: 'Checked out successfully',
+      })
     } catch (error: unknown) {
       const axiosError =
         error as AxiosError<{ message?: string }>
 
-      alert(
-        axiosError.response?.data?.message ||
-        'Check-out failed'
-      )
+      showAlert({
+        title: 'Error',
+        message:
+          axiosError.response?.data?.message ||
+          'Check-out failed',
+      })
     } finally {
       setLoading(false)
     }
@@ -683,7 +699,7 @@ function DashboardPage() {
                 <th>Status</th>
                 <th>Total Hours</th>
                 <th>Regularization Status</th>
-                <th>Action</th>
+                <th className="table-action-col">Action</th>
               </tr>
             </thead>
 
@@ -766,11 +782,11 @@ function DashboardPage() {
                       )}
                     </td>
 
-                    <td>
-                      <div className="attendance-action-cell">
+                    <td className="table-action-col">
+                      <div className="table-action-group">
                         <button
                           type="button"
-                          className="attendance-action-btn"
+                          className="table-action-btn"
                           title="Regularization request"
                           aria-label={`Open regularization request for ${row.dateLabel}`}
                           onClick={() =>

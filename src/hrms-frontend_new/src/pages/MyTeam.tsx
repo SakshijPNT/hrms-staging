@@ -192,12 +192,15 @@ function MyTeamContent() {
       return
     }
 
+    const memberId = attendanceMember.id
+    const { year, month } = monthView
+
     async function loadMonthlyLog() {
       setMonthlyLogLoading(true)
 
       try {
         const response = await api.get<MonthlyAttendanceLogResponse>(
-          `/attendance/team/${attendanceMember.id}/monthly-log/${monthView.year}/${monthView.month}`,
+          `/attendance/team/${memberId}/monthly-log/${year}/${month}`,
         )
 
         setMonthlyLogDays(response.data.days ?? [])
@@ -358,7 +361,7 @@ function MyTeamContent() {
               <th>User ID</th>
               <th>User Name</th>
               <th>Status</th>
-              <th>Actions</th>
+              <th className="table-action-col">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -392,11 +395,11 @@ function MyTeamContent() {
                         : 'Inactive'}
                     </span>
                   </td>
-                  <td>
-                    <div className="role-table-actions">
+                  <td className="table-action-col">
+                    <div className="table-action-group">
                       <button
                         type="button"
-                        className="role-action-btn"
+                        className="table-action-btn"
                         title="View user details"
                         aria-label={`View ${member.fullName}`}
                         onClick={() => void openViewModal(member)}
@@ -406,7 +409,7 @@ function MyTeamContent() {
 
                       <button
                         type="button"
-                        className="role-action-btn"
+                        className="table-action-btn"
                         title="View attendance"
                         aria-label={`View attendance for ${member.fullName}`}
                         onClick={() =>
@@ -464,7 +467,7 @@ function MyTeamContent() {
       {viewModalOpen && viewMember && (
         <div className="act-modal-overlay">
           <div
-            className="act-modal modal-md"
+            className="act-modal modal-sm role-view-modal"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="act-modal-header">
@@ -478,72 +481,19 @@ function MyTeamContent() {
               </button>
             </div>
 
-            <div className="act-modal-form role-modal-form role-view-form">
+            <div className="act-modal-form role-view-form">
               {viewLoading ? (
-                <p className="role-view-value">Loading...</p>
+                <p className="role-view-value-box">Loading...</p>
               ) : (
-                <>
+                <div className="role-view-grid">
                   <div className="role-view-field">
                     <span className="role-view-label">User ID</span>
-                    <p className="role-view-value">{viewMember.id}</p>
-                  </div>
-
-                  <div className="role-view-field">
-                    <span className="role-view-label">Full Name</span>
-                    <p className="role-view-value">
-                      {viewMember.fullName}
-                    </p>
-                  </div>
-
-                  <div className="role-view-field">
-                    <span className="role-view-label">Email</span>
-                    <p className="role-view-value">
-                      {viewMember.emailId}
-                    </p>
-                  </div>
-
-                  <div className="role-view-field">
-                    <span className="role-view-label">Role</span>
-                    <p className="role-view-value">
-                      {viewMember.roleName || '-'}
-                    </p>
-                  </div>
-
-                  <div className="role-view-field">
-                    <span className="role-view-label">Manager</span>
-                    <p className="role-view-value">
-                      {viewMember.managerName || '-'}
-                    </p>
-                  </div>
-
-                  <div className="role-view-field">
-                    <span className="role-view-label">Joining Date</span>
-                    <p className="role-view-value">
-                      {viewMember.joiningDate}
-                    </p>
-                  </div>
-
-                  <div className="role-view-field">
-                    <span className="role-view-label">
-                      Probation Months
-                    </span>
-                    <p className="role-view-value">
-                      {viewMember.probationMonths}
-                    </p>
-                  </div>
-
-                  <div className="role-view-field">
-                    <span className="role-view-label">
-                      Confirmation Date
-                    </span>
-                    <p className="role-view-value">
-                      {viewMember.confirmationDate || '-'}
-                    </p>
+                    <p className="role-view-value-box">{viewMember.id}</p>
                   </div>
 
                   <div className="role-view-field">
                     <span className="role-view-label">Status</span>
-                    <p className="role-view-value">
+                    <p className="role-view-value-box role-view-value-box--badge">
                       <span
                         className={
                           viewMember.statusCode === 1
@@ -557,18 +507,67 @@ function MyTeamContent() {
                       </span>
                     </p>
                   </div>
-                </>
-              )}
 
-              <div className="act-modal-actions">
-                <button
-                  type="button"
-                  className="act-cancel-btn"
-                  onClick={closeViewModal}
-                >
-                  Close
-                </button>
-              </div>
+                  <div className="role-view-field role-view-field--full">
+                    <span className="role-view-label">Full Name</span>
+                    <p className="role-view-value-box">
+                      {viewMember.fullName}
+                    </p>
+                  </div>
+
+                  <div className="role-view-field role-view-field--full">
+                    <span className="role-view-label">Email</span>
+                    <p className="role-view-value-box">
+                      {viewMember.emailId}
+                    </p>
+                  </div>
+
+                  <div className="role-view-field">
+                    <span className="role-view-label">Role</span>
+                    <p className="role-view-value-box">
+                      {viewMember.roleName || '-'}
+                    </p>
+                  </div>
+
+                  <div className="role-view-field">
+                    <span className="role-view-label">Manager</span>
+                    <p className="role-view-value-box">
+                      {viewMember.managerName || '-'}
+                    </p>
+                  </div>
+
+                  <div className="role-view-field">
+                    <span className="role-view-label">Joining Date</span>
+                    <p className="role-view-value-box">
+                      {viewMember.joiningDate}
+                    </p>
+                  </div>
+
+                  <div className="role-view-field">
+                    <span className="role-view-label">Confirmation Date</span>
+                    <p className="role-view-value-box">
+                      {viewMember.confirmationDate || '-'}
+                    </p>
+                  </div>
+
+                  <div className="role-view-field role-view-field--full">
+                    <span className="role-view-label">Probation Months</span>
+                    <p className="role-view-value-box">
+                      {viewMember.probationMonths}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="act-modal-actions">
+              <button
+                type="button"
+                className="act-cancel-btn"
+                onClick={closeViewModal}
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
@@ -577,7 +576,7 @@ function MyTeamContent() {
       {attendanceModalOpen && attendanceMember && (
         <div className="act-modal-overlay">
           <div
-            className="act-modal modal-lg"
+            className="act-modal team-attendance-modal-dialog"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="act-modal-header">
@@ -594,7 +593,7 @@ function MyTeamContent() {
             </div>
 
             <div className="act-modal-form team-attendance-modal">
-              <div className="attendance-month-nav">
+              <div className="attendance-month-nav team-attendance-month-nav">
                 <button
                   type="button"
                   className="attendance-month-btn"
@@ -619,8 +618,7 @@ function MyTeamContent() {
               </div>
 
               <div className="team-attendance-table-scroll">
-                <div className="act-table-wrapper">
-                  <table className="act-table attendance-history-table">
+                <table className="act-table attendance-history-table">
                     <thead>
                       <tr>
                         <th>Date</th>
@@ -630,13 +628,37 @@ function MyTeamContent() {
                         <th>Total Hours</th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody
+                      className={
+                        monthlyLogLoading
+                          ? 'attendance-history-tbody--loading'
+                          : undefined
+                      }
+                    >
                     {monthlyLogLoading ? (
-                      <tr>
-                        <td colSpan={5} className="act-empty">
-                          Loading attendance...
-                        </td>
-                      </tr>
+                      Array.from({ length: 12 }, (_, index) => (
+                        <tr
+                          key={`attendance-skeleton-${index}`}
+                          className="attendance-row-skeleton"
+                          aria-hidden="true"
+                        >
+                          <td>
+                            <span className="attendance-skeleton-bar attendance-skeleton-bar--md" />
+                          </td>
+                          <td>
+                            <span className="attendance-skeleton-bar attendance-skeleton-bar--sm" />
+                          </td>
+                          <td>
+                            <span className="attendance-skeleton-bar attendance-skeleton-bar--sm" />
+                          </td>
+                          <td>
+                            <span className="attendance-skeleton-bar attendance-skeleton-bar--lg" />
+                          </td>
+                          <td>
+                            <span className="attendance-skeleton-bar attendance-skeleton-bar--sm" />
+                          </td>
+                        </tr>
+                      ))
                     ) : attendanceRows.length === 0 ? (
                       <tr>
                         <td colSpan={5} className="act-empty">
@@ -690,19 +712,18 @@ function MyTeamContent() {
                       ))
                     )}
                     </tbody>
-                  </table>
-                </div>
+                </table>
               </div>
+            </div>
 
-              <div className="act-modal-actions">
-                <button
-                  type="button"
-                  className="act-cancel-btn"
-                  onClick={closeAttendanceModal}
-                >
-                  Close
-                </button>
-              </div>
+            <div className="act-modal-actions">
+              <button
+                type="button"
+                className="act-cancel-btn"
+                onClick={closeAttendanceModal}
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>

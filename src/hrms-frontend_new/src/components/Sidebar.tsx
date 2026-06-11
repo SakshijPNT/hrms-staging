@@ -110,6 +110,14 @@ const moduleRoutes: Record<
     ),
   },
 
+  'Admin Approval': {
+    path: '/other-requests',
+    label: 'Admin Approval',
+    icon: (
+      <HiOutlineInbox className="menu-icon" />
+    ),
+  },
+
   'Other Requests': {
     path: '/other-requests',
     label: 'Other Requests',
@@ -150,6 +158,7 @@ const SIDEBAR_MODULE_ORDER: Record<string, number> = {
   'My Leaves': 3,
   'My Approval': 4,
   'My Team': 6,
+  'Admin Approval': 7,
   'Other Requests': 7,
   Settings: 100,
 }

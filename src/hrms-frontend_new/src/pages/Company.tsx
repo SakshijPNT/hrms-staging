@@ -6,6 +6,7 @@ import type { AxiosError } from 'axios'
 import { FiSearch, FiEye } from 'react-icons/fi'
 import { MdEdit } from "react-icons/md";
 import Select from 'react-select'
+import { useAlert } from '../context/AlertContext'
 
 interface CompanyItem {
   id: number
@@ -56,6 +57,8 @@ type CompanyFieldErrors = {
 }
 
 export function CompanyPage() {
+
+  const { showAlert, showConfirm } = useAlert()
 
   const [companies, setCompanies] =
     useState<CompanyItem[]>([])
@@ -410,8 +413,7 @@ const [hasCompanyAccess, setHasCompanyAccess] =
           ? 'Are you sure you want to deactivate this company?'
           : 'Are you sure you want to activate this company?'
 
-      const confirmed =
-        window.confirm(confirmMessage)
+      const confirmed = await showConfirm(confirmMessage)
 
       if (!confirmed) {
         return
@@ -440,9 +442,10 @@ const [hasCompanyAccess, setHasCompanyAccess] =
         error
       )
 
-      alert(
-        'Failed to update company status'
-      )
+      showAlert({
+        title: 'Error',
+        message: 'Failed to update company status',
+      })
     }
   }
 
@@ -564,7 +567,7 @@ const [hasCompanyAccess, setHasCompanyAccess] =
                 <th>Country</th>
                 <th>Timezone</th>
                 <th>Status</th>
-                <th>Action</th>
+                <th className="table-action-col">Action</th>
 
 
               </tr>
@@ -648,11 +651,11 @@ const [hasCompanyAccess, setHasCompanyAccess] =
 
                     </td>
 
-                    <td>
-                      <div className="policy-table-actions">
+                    <td className="table-action-col">
+                      <div className="table-action-group policy-table-actions">
                         <button
                           type="button"
-                          className="edit-btn"
+                          className="table-action-btn"
                           title="View company"
                           aria-label={`View company ${company.companyName}`}
                           onClick={() => handleView(company)}
@@ -663,7 +666,7 @@ const [hasCompanyAccess, setHasCompanyAccess] =
                         {hasCompanyAccess && (
                           <button
                             type="button"
-                            className="edit-btn"
+                            className="table-action-btn"
                             title="Edit company"
                             aria-label={`Edit company ${company.companyName}`}
                             onClick={() => handleEdit(company)}
