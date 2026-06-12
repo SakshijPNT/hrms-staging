@@ -1,0 +1,15 @@
+**/.git
+**/.vs
+**/bin
+**/obj
+**/node_modules
+**/dist
+**/publish
+**/*.user
+**/*.suo
+**/appsettings.Development.json
+src/frontend
+src/backend
+database
+docs
+deploy/.env
