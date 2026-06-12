@@ -42,10 +42,11 @@ builder.Services.AddCors(options =>
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
 {
-    options.IdleTimeout = TimeSpan.FromMinutes(30);
+    options.IdleTimeout = TimeSpan.FromDays(365);
     options.Cookie.HttpOnly = true;
     options.Cookie.IsEssential = true;
     options.Cookie.SameSite = SameSiteMode.Lax;
+    options.Cookie.MaxAge = TimeSpan.FromDays(365);
 });
 
 builder.Services.AddInfrastructure(builder.Configuration);

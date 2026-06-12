@@ -454,18 +454,12 @@ export function MyLeavesPage() {
                     <button
                       type="button"
                       className="act-leave-card-stat-btn"
-                      // onClick={() =>
-                      //   void openBalanceDetail(leave.leaveTypeId)
-                      // }
                     >
                       Used: {formatLeaveDays(leave.used)}
                     </button>
                     <button
                       type="button"
                       className="act-leave-card-stat-btn"
-                      // onClick={() =>
-                      //   void openBalanceDetail(leave.leaveTypeId)
-                      // }
                     >
                       Pending: {formatLeaveDays(leave.pending)}
                     </button>

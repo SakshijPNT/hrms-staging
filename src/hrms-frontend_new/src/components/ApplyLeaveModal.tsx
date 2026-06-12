@@ -15,50 +15,14 @@ import {
   normalizeDate,
   parseLocalDate,
 } from '../utils/attendanceFormat'
+import {
+  isHalfDayLeave,
+  sessionFromSubLeaveType,
+  SUB_LEAVE_TYPE_OPTIONS,
+  subLeaveTypeFromApi,
+  type SubLeaveType,
+} from '../utils/leaveFormat'
 import '../styles/Style.css'
-
-type SubLeaveType = 'FULL_DAY' | 'FIRST_HALF' | 'SECOND_HALF'
-
-const SUB_LEAVE_TYPE_OPTIONS: {
-  value: SubLeaveType
-  label: string
-}[] = [
-  { value: 'FULL_DAY', label: 'Full Day' },
-  { value: 'FIRST_HALF', label: 'Half Day - First Half' },
-  { value: 'SECOND_HALF', label: 'Half Day - Second Half' },
-]
-
-function subLeaveTypeFromEdit(
-  application: LeaveApplicationEditData,
-): SubLeaveType {
-  if (!application.isHalfDay) {
-    return 'FULL_DAY'
-  }
-
-  if (application.session === 'SECOND_HALF') {
-    return 'SECOND_HALF'
-  }
-
-  return 'FIRST_HALF'
-}
-
-function isHalfDayLeave(subLeaveType: SubLeaveType) {
-  return subLeaveType !== 'FULL_DAY'
-}
-
-function sessionFromSubLeaveType(
-  subLeaveType: SubLeaveType,
-): string | null {
-  if (subLeaveType === 'FIRST_HALF') {
-    return 'FIRST_HALF'
-  }
-
-  if (subLeaveType === 'SECOND_HALF') {
-    return 'SECOND_HALF'
-  }
-
-  return null
-}
 
 interface LeaveType {
   id: number
@@ -91,7 +55,8 @@ export function ApplyLeaveModal({
   const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [monthlyWarning, setMonthlyWarning] = useState('')
+  const [monthlyLimitMessage, setMonthlyLimitMessage] = useState('')
+  const [monthlyLimitExceeded, setMonthlyLimitExceeded] = useState(false)
   const [isFromDateOpen, setIsFromDateOpen] = useState(false)
   const [isToDateOpen, setIsToDateOpen] = useState(false)
   const [form, setForm] = useState({
@@ -133,7 +98,10 @@ export function ApplyLeaveModal({
         leaveTypeId: String(editApplication.leaveTypeId),
         fromDate: normalizeDate(editApplication.fromDate),
         toDate: normalizeDate(editApplication.toDate),
-        subLeaveType: subLeaveTypeFromEdit(editApplication),
+        subLeaveType: subLeaveTypeFromApi(
+          editApplication.isHalfDay,
+          editApplication.session,
+        ),
         reason: editApplication.reason ?? '',
       })
     } else {
@@ -147,7 +115,8 @@ export function ApplyLeaveModal({
     }
 
     setError('')
-    setMonthlyWarning('')
+    setMonthlyLimitMessage('')
+    setMonthlyLimitExceeded(false)
     setIsFromDateOpen(false)
     setIsToDateOpen(false)
 
@@ -156,12 +125,14 @@ export function ApplyLeaveModal({
 
   useEffect(() => {
     if (!open || !form.leaveTypeId || !form.fromDate) {
-      setMonthlyWarning('')
+      setMonthlyLimitMessage('')
+      setMonthlyLimitExceeded(false)
       return
     }
 
     if (!isHalfDay && !form.toDate) {
-      setMonthlyWarning('')
+      setMonthlyLimitMessage('')
+      setMonthlyLimitExceeded(false)
       return
     }
 
@@ -203,13 +174,14 @@ export function ApplyLeaveModal({
         warningMessage?: string | null
       }>('/user-leaves/applications/monthly-preview', { params })
 
-      setMonthlyWarning(
-        response.data.exceedsMonthlyLimit
-          ? (response.data.warningMessage ?? '')
-          : '',
+      const exceeds = Boolean(response.data.exceedsMonthlyLimit)
+      setMonthlyLimitExceeded(exceeds)
+      setMonthlyLimitMessage(
+        exceeds ? (response.data.warningMessage ?? '') : '',
       )
     } catch {
-      setMonthlyWarning('')
+      setMonthlyLimitMessage('')
+      setMonthlyLimitExceeded(false)
     }
   }
 
@@ -223,6 +195,16 @@ export function ApplyLeaveModal({
     }
   }
 
+  function handleSubLeaveTypeChange(subLeaveType: SubLeaveType) {
+    setForm((current) => ({
+      ...current,
+      subLeaveType,
+      toDate: isHalfDayLeave(subLeaveType)
+        ? current.fromDate
+        : current.toDate,
+    }))
+  }
+
   async function handleLeaveSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
@@ -233,6 +215,14 @@ export function ApplyLeaveModal({
 
     if (!isHalfDay && !form.toDate) {
       setError('Please select a to date.')
+      return
+    }
+
+    if (monthlyLimitExceeded) {
+      setError(
+        monthlyLimitMessage ||
+          'You have exceeded this month\'s leave quota for the selected leave type.',
+      )
       return
     }
 
@@ -336,21 +326,13 @@ export function ApplyLeaveModal({
                 value={
                   subLeaveTypeOptions.find(
                     (option) => option.value === form.subLeaveType,
-                  ) || null
+                  ) || subLeaveTypeOptions[0]
                 }
-                onChange={(selected) => {
-                  const subLeaveType =
-                    (selected?.value as SubLeaveType | undefined) ??
-                    'FULL_DAY'
-
-                  setForm((current) => ({
-                    ...current,
-                    subLeaveType,
-                    toDate: isHalfDayLeave(subLeaveType)
-                      ? current.fromDate
-                      : current.toDate,
-                  }))
-                }}
+                onChange={(selected) =>
+                  handleSubLeaveTypeChange(
+                    (selected?.value as SubLeaveType | undefined) ?? 'FULL_DAY',
+                  )
+                }
               />
             </label>
           </div>
@@ -395,44 +377,42 @@ export function ApplyLeaveModal({
               </div>
             </label>
 
-            <label className="act-form-field">
-              <span>To Date *</span>
+            {!isHalfDay && (
+              <label className="act-form-field">
+                <span>To Date *</span>
 
-              <div className="act-date-picker-wrapper">
-                <DatePicker
-                  selected={form.toDate ? parseLocalDate(form.toDate) : null}
-                  onChange={(date: Date | null) => {
-                    setForm((current) => ({
-                      ...current,
-                      toDate: date ? formatLocalDateIso(date) : '',
-                    }))
+                <div className="act-date-picker-wrapper">
+                  <DatePicker
+                    selected={form.toDate ? parseLocalDate(form.toDate) : null}
+                    onChange={(date: Date | null) => {
+                      setForm((current) => ({
+                        ...current,
+                        toDate: date ? formatLocalDateIso(date) : '',
+                      }))
 
-                    setIsToDateOpen(false)
-                  }}
-                  onInputClick={() => setIsToDateOpen(true)}
-                  open={isToDateOpen}
-                  onClickOutside={() => setIsToDateOpen(false)}
-                  placeholderText="Select to date"
-                  dateFormat="dd MMM yyyy"
-                  className="act-date-picker"
-                  popperClassName="act-datepicker-popper"
-                  portalId="root"
-                  popperPlacement="bottom-start"
-                  disabled={isHalfDay}
-                />
-
-                <FiCalendar
-                  className={`act-date-icon ${
-                    isHalfDay ? 'disabled-date-icon' : ''
-                  }`}
-                  onClick={() => {
-                    if (!isHalfDay) {
-                      setIsToDateOpen((prev) => !prev)
+                      setIsToDateOpen(false)
+                    }}
+                    onInputClick={() => setIsToDateOpen(true)}
+                    open={isToDateOpen}
+                    onClickOutside={() => setIsToDateOpen(false)}
+                    placeholderText="Select to date"
+                    dateFormat="dd MMM yyyy"
+                    className="act-date-picker"
+                    popperClassName="act-datepicker-popper"
+                    portalId="root"
+                    popperPlacement="bottom-start"
+                    minDate={
+                      form.fromDate ? parseLocalDate(form.fromDate) : undefined
                     }
-                  }}
-                />
-              </div>
-            </label>
+                  />
+
+                  <FiCalendar
+                    className="act-date-icon"
+                    onClick={() => setIsToDateOpen((prev) => !prev)}
+                  />
+                </div>
+              </label>
+            )}
           </div>
 
           <div className="act-form-row">
@@ -452,8 +432,8 @@ export function ApplyLeaveModal({
             </label>
           </div>
 
-          {monthlyWarning && (
-            <div className="form-warning">{monthlyWarning}</div>
+          {monthlyLimitMessage && (
+            <div className="form-error">{monthlyLimitMessage}</div>
           )}
 
           {error && <div className="form-error">{error}</div>}
@@ -473,7 +453,7 @@ export function ApplyLeaveModal({
             type="submit"
             form="apply-leave-form"
             className="act-submit-btn"
-            disabled={loading}
+            disabled={loading || monthlyLimitExceeded}
           >
             {loading
               ? editApplication

@@ -1,3 +1,4 @@
+import { formatSubLeaveType } from '../utils/leaveFormat'
 import '../styles/Style.css'
 
 export interface LeaveRequestDetail {
@@ -20,14 +21,6 @@ interface LeaveRequestViewModalProps {
   open: boolean
   request: LeaveRequestDetail | null
   onClose: () => void
-}
-
-function formatSession(session: string | null) {
-  if (!session) {
-    return '-'
-  }
-
-  return session === 'FIRST_HALF' ? 'First Half' : 'Second Half'
 }
 
 function formatDateTime(value: string | null) {
@@ -126,29 +119,18 @@ export function LeaveRequestViewModal({
             </label>
 
             <label className="act-form-field">
-              <span>Half Day</span>
+              <span>Sub Leave Type</span>
               <input
                 type="text"
                 className="approval-detail-readonly"
-                value={request.isHalfDay ? 'Yes' : 'No'}
+                value={formatSubLeaveType(
+                  request.isHalfDay,
+                  request.session,
+                )}
                 readOnly
               />
             </label>
           </div>
-
-          {request.isHalfDay && (
-            <div className="act-form-row">
-              <label className="act-form-field">
-                <span>Session</span>
-                <input
-                  type="text"
-                  className="approval-detail-readonly"
-                  value={formatSession(request.session)}
-                  readOnly
-                />
-              </label>
-            </div>
-          )}
 
           <div className="act-form-row">
             <label className="act-form-field">

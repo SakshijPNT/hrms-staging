@@ -35,7 +35,65 @@ public static class FiscalYearHelper
         $"{date.Year:D4}-{date.Month:D2}";
 
     public static decimal CalculateMonthlyAllocation(decimal maxDaysAllowed) =>
-        Math.Round(maxDaysAllowed / 12m, 1, MidpointRounding.AwayFromZero);
+        maxDaysAllowed / 12m;
+
+    public static DateOnly GetFiscalYearStartDate(
+        short fiscalCycleYear,
+        short fiscalYearStartMonth,
+        short fiscalYearStartDay)
+    {
+        var month = NormalizeMonth(fiscalYearStartMonth);
+        var day = NormalizeDay(fiscalYearStartDay, month, fiscalCycleYear);
+        return new DateOnly(fiscalCycleYear, month, day);
+    }
+
+    public static (DateOnly Start, DateOnly End) GetFiscalMonthRangeForDate(
+        DateOnly date,
+        short fiscalYearStartMonth,
+        short fiscalYearStartDay)
+    {
+        var cycleYear = GetFiscalCycleStartYear(
+            date,
+            fiscalYearStartMonth,
+            fiscalYearStartDay);
+        var fiscalStart = GetFiscalYearStartDate(
+            cycleYear,
+            fiscalYearStartMonth,
+            fiscalYearStartDay);
+
+        for (var monthIndex = 0; monthIndex < 12; monthIndex++)
+        {
+            var periodStart = fiscalStart.AddMonths(monthIndex);
+            var periodEnd = fiscalStart.AddMonths(monthIndex + 1).AddDays(-1);
+
+            if (date >= periodStart && date <= periodEnd)
+            {
+                return (periodStart, periodEnd);
+            }
+        }
+
+        var lastStart = fiscalStart.AddMonths(11);
+        var lastEnd = fiscalStart.AddYears(1).AddDays(-1);
+        return (lastStart, lastEnd);
+    }
+
+    public static bool IsSameFiscalMonth(
+        DateOnly left,
+        DateOnly right,
+        short fiscalYearStartMonth,
+        short fiscalYearStartDay)
+    {
+        var (leftStart, _) = GetFiscalMonthRangeForDate(
+            left,
+            fiscalYearStartMonth,
+            fiscalYearStartDay);
+        var (rightStart, _) = GetFiscalMonthRangeForDate(
+            right,
+            fiscalYearStartMonth,
+            fiscalYearStartDay);
+
+        return leftStart == rightStart;
+    }
 
     public static (short Month, short Day) NormalizeFiscalStart(
         short fiscalYearStartMonth,

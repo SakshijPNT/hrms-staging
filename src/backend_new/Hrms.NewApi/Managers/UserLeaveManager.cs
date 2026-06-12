@@ -59,17 +59,40 @@ public class UserLeaveManager : IUserLeaveManager
             .FirstOrDefaultAsync(cancellationToken)
             ?? throw new InvalidOperationException("Company not found.");
 
+        ValidateFiscalMonthLeaveScope(
+            request.FromDate,
+            request.ToDate,
+            company.FiscalYearStartMonth,
+            company.FiscalYearStartDay);
+
         var companyToday = FiscalYearHelper.GetCompanyToday(company.Timezone);
         var fiscalCycleYear = FiscalYearHelper.GetFiscalCycleStartYear(
             companyToday,
             company.FiscalYearStartMonth,
             company.FiscalYearStartDay);
 
+        await InitializeLeaveBalancesForUserAsync(
+            userId,
+            companyId,
+            userId,
+            cancellationToken);
+
         await ValidateLeaveBalanceAsync(
             userId,
             request.LeaveTypeId,
             fiscalCycleYear,
             totalDays,
+            cancellationToken);
+
+        await ValidateMonthlyLeaveQuotaAsync(
+            userId,
+            request.LeaveTypeId,
+            request.FromDate,
+            request.IsHalfDay,
+            fiscalCycleYear,
+            company.FiscalYearStartMonth,
+            company.FiscalYearStartDay,
+            excludeLeaveId: null,
             cancellationToken);
 
         var now = DateTimeOffset.UtcNow;
@@ -124,72 +147,36 @@ public class UserLeaveManager : IUserLeaveManager
             company.FiscalYearStartMonth,
             company.FiscalYearStartDay);
 
-        var balance = await _dbContext.UserLeaveBalances
-            .FirstOrDefaultAsync(
-                x => x.UserId == userId
-                    && x.LeaveTypeId == request.LeaveTypeId
-                    && x.CycleYear == fiscalCycleYear
-                    && x.StatusCode == 1,
-                cancellationToken);
-
-        if (balance == null)
-        {
-            return new LeaveApplicationMonthlyPreviewDto
-            {
-                TotalDays = totalDays,
-                MonthlyAvailable = 0m,
-                ExceedsMonthlyLimit = false,
-                ExcessDays = 0m,
-            };
-        }
-
-        await EnsureMonthlyAllocationAsync(balance, cancellationToken);
-
-        if (IsSameCalendarMonth(request.FromDate, companyToday))
-        {
-            await SyncMonthlyBalanceAsync(
-                balance,
-                company.Timezone,
-                companyToday,
-                cancellationToken);
-        }
-
-        var approvedInMonth = await GetApprovedDaysInLeaveMonthAsync(
+        var (monthlyAllocation, monthlyRemaining) = await GetMonthlyQuotaContextForApplicationAsync(
             userId,
             request.LeaveTypeId,
             request.FromDate,
-            cancellationToken);
-
-        var pendingInMonth = await GetPendingDaysInLeaveMonthAsync(
-            userId,
-            request.LeaveTypeId,
-            request.FromDate,
+            fiscalCycleYear,
+            company.FiscalYearStartMonth,
+            company.FiscalYearStartDay,
             excludeLeaveId,
             cancellationToken);
 
-        var monthlyRemaining = IsSameCalendarMonth(request.FromDate, companyToday)
-            ? balance.MonthlyPending - pendingInMonth
-            : balance.MonthlyAllocation
-                + balance.MonthlyCarryForward
-                - approvedInMonth
-                - pendingInMonth;
-
-        var excessDays = CalculateMonthlyExcessForWarning(totalDays, monthlyRemaining);
+        var requestConsumption = GetMonthlyQuotaConsumption(
+            request.IsHalfDay,
+            monthlyAllocation);
+        var excessQuota = CalculateMonthlyQuotaExcess(
+            requestConsumption,
+            monthlyRemaining);
 
         string? warningMessage = null;
-        if (excessDays > 0)
+        if (excessQuota > 0)
         {
-            var excessLabel = FormatLeaveDays(excessDays);
             warningMessage =
-                $"You are requesting {FormatLeaveDays(totalDays)} but only {FormatLeaveDays(Math.Max(0m, monthlyRemaining))} remain in this month's leave quota. The additional {excessLabel} will be deducted from next month's leave balance.";
+                $"This leave uses {FormatLeaveDays(requestConsumption)} of the monthly quota, but only {FormatLeaveDays(Math.Max(0m, monthlyRemaining))} remain for this leave type.";
         }
 
         return new LeaveApplicationMonthlyPreviewDto
         {
             TotalDays = totalDays,
             MonthlyAvailable = Math.Max(0m, monthlyRemaining),
-            ExceedsMonthlyLimit = excessDays > 0,
-            ExcessDays = excessDays,
+            ExceedsMonthlyLimit = excessQuota > 0,
+            ExcessDays = excessQuota,
             WarningMessage = warningMessage,
         };
     }
@@ -305,17 +292,40 @@ public class UserLeaveManager : IUserLeaveManager
             .FirstOrDefaultAsync(cancellationToken)
             ?? throw new InvalidOperationException("Company not found.");
 
+        ValidateFiscalMonthLeaveScope(
+            request.FromDate,
+            request.ToDate,
+            company.FiscalYearStartMonth,
+            company.FiscalYearStartDay);
+
         var companyToday = FiscalYearHelper.GetCompanyToday(company.Timezone);
         var fiscalCycleYear = FiscalYearHelper.GetFiscalCycleStartYear(
             companyToday,
             company.FiscalYearStartMonth,
             company.FiscalYearStartDay);
 
+        await InitializeLeaveBalancesForUserAsync(
+            userId,
+            companyId,
+            userId,
+            cancellationToken);
+
         await ValidateLeaveBalanceAsync(
             userId,
             request.LeaveTypeId,
             fiscalCycleYear,
             totalDays,
+            cancellationToken);
+
+        await ValidateMonthlyLeaveQuotaAsync(
+            userId,
+            request.LeaveTypeId,
+            request.FromDate,
+            request.IsHalfDay,
+            fiscalCycleYear,
+            company.FiscalYearStartMonth,
+            company.FiscalYearStartDay,
+            excludeLeaveId: leaveId,
             cancellationToken);
 
         leave.LeaveTypeId = request.LeaveTypeId;
@@ -413,6 +423,7 @@ public class UserLeaveManager : IUserLeaveManager
                 entity.UserId,
                 entity.LeaveTypeId,
                 entity.FromDate,
+                entity.IsHalfDay,
                 entity.TotalDays,
                 companyId,
                 approverId,
@@ -540,13 +551,40 @@ public class UserLeaveManager : IUserLeaveManager
             .FirstOrDefaultAsync(cancellationToken)
             ?? throw new InvalidOperationException("Company not found.");
 
+        await InitializeLeaveBalancesForUserAsync(
+            userId,
+            companyId,
+            userId,
+            cancellationToken);
+
         var companyToday = FiscalYearHelper.GetCompanyToday(company.Timezone);
         var fiscalCycleYear = FiscalYearHelper.GetFiscalCycleStartYear(
             companyToday,
             company.FiscalYearStartMonth,
             company.FiscalYearStartDay);
 
-        return await (
+        var (monthStart, monthEnd) = FiscalYearHelper.GetFiscalMonthRangeForDate(
+            companyToday,
+            company.FiscalYearStartMonth,
+            company.FiscalYearStartDay);
+
+        var monthApplications = await _dbContext.LeaveApplications
+            .AsNoTracking()
+            .Where(x =>
+                x.UserId == userId
+                && x.StatusCode == 1
+                && (x.ApprovalStatus == "APPROVED" || x.ApprovalStatus == "PENDING")
+                && x.FromDate >= monthStart
+                && x.FromDate <= monthEnd)
+            .Select(x => new
+            {
+                x.LeaveTypeId,
+                x.IsHalfDay,
+                x.ApprovalStatus,
+            })
+            .ToListAsync(cancellationToken);
+
+        var rows = await (
             from leaveType in _dbContext.LeaveTypeMasters.AsNoTracking()
             where leaveType.CompanyId == companyId && leaveType.StatusCode == 1
             join balance in _dbContext.UserLeaveBalances.AsNoTracking()
@@ -557,23 +595,49 @@ public class UserLeaveManager : IUserLeaveManager
                 on leaveType.Id equals balance.LeaveTypeId into balances
             from balance in balances.DefaultIfEmpty()
             orderby leaveType.LeaveTypeName
-            select new UserLeaveBalanceDTO
+            select new
             {
-                LeaveTypeId = leaveType.Id,
-                LeaveTypeName = leaveType.LeaveTypeName,
-                TotalAnnual = leaveType.MaxDaysAllowed,
-                MonthlyLeave = balance != null
-                    ? balance.MonthlyAllocation
-                    : FiscalYearHelper.CalculateMonthlyAllocation(leaveType.MaxDaysAllowed),
-                Used = balance != null ? balance.TakenDays : 0m,
-                Pending = balance != null
-                    ? balance.AvailableBalance
-                    : leaveType.MaxDaysAllowed,
-                AvailableBalance = balance != null
-                    ? balance.AvailableBalance
-                    : leaveType.MaxDaysAllowed,
+                leaveType.Id,
+                leaveType.LeaveTypeName,
+                leaveType.MaxDaysAllowed,
+                Balance = balance,
             })
             .ToListAsync(cancellationToken);
+
+        return rows.Select(row =>
+        {
+            var monthlyQuota = FiscalYearHelper.CalculateMonthlyAllocation(
+                row.MaxDaysAllowed);
+
+            var monthlyUsed = monthApplications
+                .Where(x =>
+                    x.LeaveTypeId == row.Id
+                    && x.ApprovalStatus == "APPROVED")
+                .Sum(x => GetMonthlyQuotaConsumption(x.IsHalfDay, monthlyQuota));
+
+            var monthlyPendingApps = monthApplications
+                .Where(x =>
+                    x.LeaveTypeId == row.Id
+                    && x.ApprovalStatus == "PENDING")
+                .Sum(x => GetMonthlyQuotaConsumption(x.IsHalfDay, monthlyQuota));
+
+            var monthlyRemaining = Math.Max(
+                0m,
+                monthlyQuota - monthlyUsed - monthlyPendingApps);
+
+            return new UserLeaveBalanceDTO
+            {
+                LeaveTypeId = row.Id,
+                LeaveTypeName = row.LeaveTypeName,
+                TotalAnnual = row.MaxDaysAllowed,
+                MonthlyLeave = monthlyQuota,
+                MonthlyUsed = monthlyUsed,
+                MonthlyRemaining = monthlyRemaining,
+                Used = row.Balance?.TakenDays ?? 0m,
+                Pending = row.Balance?.AvailableBalance ?? row.MaxDaysAllowed,
+                AvailableBalance = row.Balance?.AvailableBalance ?? row.MaxDaysAllowed,
+            };
+        }).ToList();
     }
 
     public async Task<UserLeaveBalanceDetailDto> GetUserLeaveBalanceDetailAsync(
@@ -718,6 +782,103 @@ public class UserLeaveManager : IUserLeaveManager
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    private async Task ValidateMonthlyLeaveQuotaAsync(
+        int userId,
+        int leaveTypeId,
+        DateOnly leaveFromDate,
+        bool isHalfDay,
+        short fiscalCycleYear,
+        short fiscalYearStartMonth,
+        short fiscalYearStartDay,
+        int? excludeLeaveId,
+        CancellationToken cancellationToken)
+    {
+        var (monthlyAllocation, monthlyRemaining) = await GetMonthlyQuotaContextForApplicationAsync(
+            userId,
+            leaveTypeId,
+            leaveFromDate,
+            fiscalCycleYear,
+            fiscalYearStartMonth,
+            fiscalYearStartDay,
+            excludeLeaveId,
+            cancellationToken);
+
+        var requestConsumption = GetMonthlyQuotaConsumption(isHalfDay, monthlyAllocation);
+        var excessQuota = CalculateMonthlyQuotaExcess(requestConsumption, monthlyRemaining);
+        if (excessQuota > 0)
+        {
+            throw new InvalidOperationException(
+                $"This leave uses {FormatLeaveDays(requestConsumption)} of the monthly quota, but only {FormatLeaveDays(Math.Max(0m, monthlyRemaining))} remain for this leave type.");
+        }
+    }
+
+    private async Task<(decimal MonthlyAllocation, decimal MonthlyRemaining)> GetMonthlyQuotaContextForApplicationAsync(
+        int userId,
+        int leaveTypeId,
+        DateOnly leaveFromDate,
+        short fiscalCycleYear,
+        short fiscalYearStartMonth,
+        short fiscalYearStartDay,
+        int? excludeLeaveId,
+        CancellationToken cancellationToken)
+    {
+        var monthlyAllocation = await ResolveMonthlyAllocationAsync(
+            userId,
+            leaveTypeId,
+            fiscalCycleYear,
+            cancellationToken);
+
+        if (monthlyAllocation <= 0)
+        {
+            return (0m, 0m);
+        }
+
+        var approvedQuotaUsed = await GetApprovedMonthlyQuotaUsedInFiscalMonthAsync(
+            userId,
+            leaveTypeId,
+            leaveFromDate,
+            monthlyAllocation,
+            fiscalYearStartMonth,
+            fiscalYearStartDay,
+            cancellationToken);
+
+        var pendingQuotaUsed = await GetPendingMonthlyQuotaUsedInFiscalMonthAsync(
+            userId,
+            leaveTypeId,
+            leaveFromDate,
+            monthlyAllocation,
+            fiscalYearStartMonth,
+            fiscalYearStartDay,
+            excludeLeaveId,
+            cancellationToken);
+
+        var monthlyRemaining = Math.Max(
+            0m,
+            monthlyAllocation - approvedQuotaUsed - pendingQuotaUsed);
+
+        return (monthlyAllocation, monthlyRemaining);
+    }
+
+    private async Task<decimal> ResolveMonthlyAllocationAsync(
+        int userId,
+        int leaveTypeId,
+        short fiscalCycleYear,
+        CancellationToken cancellationToken)
+    {
+        var maxDaysAllowed = await _dbContext.LeaveTypeMasters
+            .AsNoTracking()
+            .Where(x => x.Id == leaveTypeId && x.StatusCode == 1)
+            .Select(x => (decimal?)x.MaxDaysAllowed)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (!maxDaysAllowed.HasValue)
+        {
+            return 0m;
+        }
+
+        return FiscalYearHelper.CalculateMonthlyAllocation(maxDaysAllowed.Value);
+    }
+
     private async Task ValidateLeaveBalanceAsync(
         int userId,
         int leaveTypeId,
@@ -753,16 +914,21 @@ public class UserLeaveManager : IUserLeaveManager
         }
     }
 
-    private async Task<decimal> GetApprovedDaysInLeaveMonthAsync(
+    private async Task<decimal> GetApprovedMonthlyQuotaUsedInFiscalMonthAsync(
         int userId,
         int leaveTypeId,
         DateOnly leaveFromDate,
+        decimal monthlyAllocation,
+        short fiscalYearStartMonth,
+        short fiscalYearStartDay,
         CancellationToken cancellationToken)
     {
-        var monthStart = new DateOnly(leaveFromDate.Year, leaveFromDate.Month, 1);
-        var monthEnd = monthStart.AddMonths(1).AddDays(-1);
+        var (monthStart, monthEnd) = FiscalYearHelper.GetFiscalMonthRangeForDate(
+            leaveFromDate,
+            fiscalYearStartMonth,
+            fiscalYearStartDay);
 
-        return await _dbContext.LeaveApplications
+        var applications = await _dbContext.LeaveApplications
             .AsNoTracking()
             .Where(x =>
                 x.UserId == userId
@@ -771,18 +937,27 @@ public class UserLeaveManager : IUserLeaveManager
                 && x.ApprovalStatus == "APPROVED"
                 && x.FromDate >= monthStart
                 && x.FromDate <= monthEnd)
-            .SumAsync(x => x.TotalDays, cancellationToken);
+            .Select(x => x.IsHalfDay)
+            .ToListAsync(cancellationToken);
+
+        return applications.Sum(isHalfDay =>
+            GetMonthlyQuotaConsumption(isHalfDay, monthlyAllocation));
     }
 
-    private async Task<decimal> GetPendingDaysInLeaveMonthAsync(
+    private async Task<decimal> GetPendingMonthlyQuotaUsedInFiscalMonthAsync(
         int userId,
         int leaveTypeId,
         DateOnly leaveFromDate,
+        decimal monthlyAllocation,
+        short fiscalYearStartMonth,
+        short fiscalYearStartDay,
         int? excludeLeaveId,
         CancellationToken cancellationToken)
     {
-        var monthStart = new DateOnly(leaveFromDate.Year, leaveFromDate.Month, 1);
-        var monthEnd = monthStart.AddMonths(1).AddDays(-1);
+        var (monthStart, monthEnd) = FiscalYearHelper.GetFiscalMonthRangeForDate(
+            leaveFromDate,
+            fiscalYearStartMonth,
+            fiscalYearStartDay);
 
         var query = _dbContext.LeaveApplications
             .AsNoTracking()
@@ -799,96 +974,71 @@ public class UserLeaveManager : IUserLeaveManager
             query = query.Where(x => x.Id != excludeLeaveId.Value);
         }
 
-        return await query.SumAsync(x => x.TotalDays, cancellationToken);
+        var applications = await query
+            .Select(x => x.IsHalfDay)
+            .ToListAsync(cancellationToken);
+
+        return applications.Sum(isHalfDay =>
+            GetMonthlyQuotaConsumption(isHalfDay, monthlyAllocation));
     }
 
     private async Task EnsureMonthlyAllocationAsync(
         UserLeaveBalance balance,
         CancellationToken cancellationToken)
     {
-        if (balance.MonthlyAllocation > 0)
-        {
-            return;
-        }
-
         var maxDaysAllowed = await _dbContext.LeaveTypeMasters
             .AsNoTracking()
             .Where(x => x.Id == balance.LeaveTypeId && x.StatusCode == 1)
             .Select(x => (decimal?)x.MaxDaysAllowed)
             .FirstOrDefaultAsync(cancellationToken);
 
-        if (maxDaysAllowed.HasValue)
+        if (!maxDaysAllowed.HasValue)
         {
-            balance.MonthlyAllocation = FiscalYearHelper.CalculateMonthlyAllocation(
-                maxDaysAllowed.Value);
-        }
-    }
-
-    private async Task SyncMonthlyBalanceAsync(
-        UserLeaveBalance balance,
-        string? companyTimezone,
-        DateOnly currentMonth,
-        CancellationToken cancellationToken)
-    {
-        await EnsureMonthlyAllocationAsync(balance, cancellationToken);
-
-        if (balance.MonthlyAllocation <= 0)
-        {
-            balance.MonthlyUsed = 0m;
-            balance.MonthlyPending = 0m;
             return;
         }
 
-        var monthStart = new DateOnly(currentMonth.Year, currentMonth.Month, 1);
-        var monthEnd = monthStart.AddMonths(1).AddDays(-1);
-
-        var approvedThisMonth = await _dbContext.LeaveApplications
-            .AsNoTracking()
-            .Where(x =>
-                x.UserId == balance.UserId
-                && x.LeaveTypeId == balance.LeaveTypeId
-                && x.StatusCode == 1
-                && x.ApprovalStatus == "APPROVED"
-                && x.FromDate >= monthStart
-                && x.FromDate <= monthEnd)
-            .SumAsync(x => x.TotalDays, cancellationToken);
-
-        balance.MonthlyUsed = approvedThisMonth;
-        balance.MonthlyPending = Math.Max(
-            0m,
-            balance.MonthlyAllocation + balance.MonthlyCarryForward - approvedThisMonth);
+        balance.MonthlyAllocation = FiscalYearHelper.CalculateMonthlyAllocation(
+            maxDaysAllowed.Value);
     }
 
-    private static bool IsSameCalendarMonth(DateOnly left, DateOnly right) =>
-        left.Year == right.Year && left.Month == right.Month;
+    private static decimal GetMonthlyQuotaConsumption(
+        bool isHalfDay,
+        decimal monthlyAllocation) =>
+        isHalfDay ? monthlyAllocation / 2m : monthlyAllocation;
 
-    /// <summary>
-    /// Warn only when the request clearly exceeds the monthly quota (e.g. 2 days when 1 remains).
-    /// Suppresses fractional "0.3 day" noise caused by annual/12 accrual rounding on single-day requests.
-    /// </summary>
-    private static decimal CalculateMonthlyExcessForWarning(
-        decimal totalDays,
+    private static void ValidateFiscalMonthLeaveScope(
+        DateOnly fromDate,
+        DateOnly toDate,
+        short fiscalYearStartMonth,
+        short fiscalYearStartDay)
+    {
+        if (!FiscalYearHelper.IsSameFiscalMonth(
+                fromDate,
+                toDate,
+                fiscalYearStartMonth,
+                fiscalYearStartDay))
+        {
+            throw new InvalidOperationException(
+                "Leave cannot span multiple fiscal months. Apply only within the current fiscal month's quota.");
+        }
+    }
+
+    private static decimal CalculateMonthlyQuotaExcess(
+        decimal requestedConsumption,
         decimal monthlyRemaining)
     {
-        if (monthlyRemaining >= totalDays)
+        if (monthlyRemaining >= requestedConsumption)
         {
             return 0m;
         }
 
-        var excessDays = totalDays - monthlyRemaining;
-
-        if (totalDays <= Math.Ceiling(monthlyRemaining))
-        {
-            return 0m;
-        }
-
-        return excessDays;
+        return requestedConsumption - monthlyRemaining;
     }
 
     private static string FormatLeaveDays(decimal days) =>
         days == 1m ? "1 day" :
         days == 0.5m ? "0.5 day" :
-        $"{days:0.#} days";
+        $"{days:0.##} days";
 
     private static IReadOnlySet<DayOfWeek> ParseWorkDays(string workDays)
     {
@@ -1081,6 +1231,7 @@ public class UserLeaveManager : IUserLeaveManager
         int userId,
         int leaveTypeId,
         DateOnly leaveFromDate,
+        bool isHalfDay,
         decimal totalDays,
         int companyId,
         int updatedBy,
@@ -1116,29 +1267,23 @@ public class UserLeaveManager : IUserLeaveManager
 
         await EnsureMonthlyAllocationAsync(balance, cancellationToken);
 
-        var approvedInLeaveMonth = await GetApprovedDaysInLeaveMonthAsync(
+        var approvedQuotaUsed = await GetApprovedMonthlyQuotaUsedInFiscalMonthAsync(
             userId,
             leaveTypeId,
             leaveFromDate,
+            balance.MonthlyAllocation,
+            company.FiscalYearStartMonth,
+            company.FiscalYearStartDay,
             cancellationToken);
 
-        var availableInLeaveMonth = balance.MonthlyAllocation
-            + balance.MonthlyCarryForward
-            - approvedInLeaveMonth;
-
-        var borrowFromFuture = Math.Max(0m, totalDays - availableInLeaveMonth);
-
-        if (borrowFromFuture > 0)
+        var requestConsumption = GetMonthlyQuotaConsumption(
+            isHalfDay,
+            balance.MonthlyAllocation);
+        var monthlyRemaining = balance.MonthlyAllocation - approvedQuotaUsed;
+        if (requestConsumption > monthlyRemaining)
         {
-            balance.MonthlyCarryForward -= borrowFromFuture;
-        }
-
-        if (IsSameCalendarMonth(leaveFromDate, companyToday))
-        {
-            balance.MonthlyUsed = approvedInLeaveMonth + totalDays;
-            balance.MonthlyPending = Math.Max(
-                0m,
-                balance.MonthlyAllocation + balance.MonthlyCarryForward - balance.MonthlyUsed);
+            throw new InvalidOperationException(
+                $"Cannot approve leave: this request uses {FormatLeaveDays(requestConsumption)} of the monthly quota, but only {FormatLeaveDays(Math.Max(0m, monthlyRemaining))} remain.");
         }
 
         if (balance.AvailableBalance < totalDays)
@@ -1151,6 +1296,20 @@ public class UserLeaveManager : IUserLeaveManager
 
         balance.TakenDays += totalDays;
         balance.AvailableBalance -= totalDays;
+        balance.MonthlyCarryForward = 0m;
+
+        if (FiscalYearHelper.IsSameFiscalMonth(
+                leaveFromDate,
+                companyToday,
+                company.FiscalYearStartMonth,
+                company.FiscalYearStartDay))
+        {
+            balance.MonthlyUsed = approvedQuotaUsed + requestConsumption;
+            balance.MonthlyPending = Math.Max(
+                0m,
+                balance.MonthlyAllocation - balance.MonthlyUsed);
+        }
+
         balance.UpdatedBy = updatedBy;
         balance.UpdatedOn = now;
     }
